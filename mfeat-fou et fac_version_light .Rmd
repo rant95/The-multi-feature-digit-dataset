@@ -1,0 +1,2166 @@
+---
+title: "Projet The multi-feature digit dataset Fou & Fac "
+subtitle: "STA211 - 2019/2020"
+author: 'L.RANT '
+date: "`r format(Sys.time(),'%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: lumen
+    code_folding: hide
+---
+```{r setup, include=FALSE}
+#output: pdf_document
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(rmdformats)
+#install.packages("dbplyr", dependencies = TRUE)
+#remove.packages("tidyverse")
+#output: 
+ # html_document:
+  #  toc: true
+  #  toc_depth: 3
+  #  toc_float: true
+  #  theme: lumen
+   # code_folding: hide
+library(FactoMineR)
+library(factoextra)
+library(knitr)
+library(kableExtra)
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+ library(questionr)
+library(ggplot2)
+library(ggpubr)
+library(caret)
+library(BioStatR)
+library(rattle)
+library(rpart)
+
+```
+
+
+# 1 Introduction
+
+
+Ce jeu de données est constitué de caractéristiques de chiffres manuscrits (`0'--`9') extrait d'une collection de cartes d'utilité publique néerlandaises. Les modèles ont été numérisés en  images binaire. Ces chiffres sont représentés par les six des ensembles de fonctionnalités suivantes : 
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes; 
+2. mfeat-fac: 216 profile correlations; 
+3. mfeat-kar: 64 Karhunen-Love coefficients; 
+4. mfeat-pix: 240 pixel averages in 2 x 3 windows; 
+5. mfeat-zer: 47 Zernike moments; 
+6. mfeat-mor: 6 morphological features. 
+
+Nous n'avons pas de valeurs manquantes.
+La problématique: en analysant les 6 groupes séparement on gardera dans chaque groupe les variables qui influence le plus le choix des classes et cherchera le meilleur algorithme qui peut predire les classes.
+
+# 2 Importation des données
+```{r, echo = FALSE, warning=FALSE, results='hide'}
+
+theme_set(theme_pubr())
+setwd("C:/Users/lnzb7292/Downloads/STA211/projet s2 2019/"); #Lova
+#setwd()  #Dimitri
+#setwd()  #Romain
+
+load("data_train.rda")
+load("data_test.rda")
+#str(data_train$class)
+#str(data_test$class)
+```
+Nous chargeons le fichier data_train et les bibliothèques associées.
+
+# 3 Aperçu général
+
+```{r, echo = TRUE, eval=FALSE, warning=FALSE}
+table(sapply(data_train,class))
+nrow(data_train)
+ncol(data_train)
+nrow(data_train$class)
+sum(data_train$class == "0")
+sum(data_train$class == "1")
+```
+
+
+```{r, echo = TRUE, eval=FALSE, warning=FALSE}
+data_train[1002,]$class
+
+```
+Nous avons 650 variables et 1500 patterns. On une variable factor qui correspond à "class" et 649 variables numériques.
+Nous avons 150 patterns par classe (0-9).
+
+Nous allons explorer et prétraiter chaque groupe séparement puis les transformer afin de réduire le nombre de variables pour les prédictions.
+
+
+```{r, echo = TRUE, eval=FALSE,warning=FALSE}
+#variables quantitatives
+var.numeric<-which(sapply(data_train,class)=="numeric"|sapply(data_train,class)=="Factor")
+names(var.numeric)
+#variables qualitatives
+var.factor<-which(sapply(data_train,class)=="factor")
+names(var.factor)
+
+```
+
+
+
+
+# 4 Exploration
+## 4.1 Analyse univariée
+### 4.1.1 Variables quantitatives
+#### 4.1.1.1 Indicateurs statistiques
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes
+
+
+```{r, echo = TRUE, eval=TRUE,warning=FALSE}
+data_fou = data_train[, c(217: 292,650)]
+data_fou_pred = data_test[1, c(217: 292)]
+var1.numeric<-which(sapply(data_fou,class)=="numeric"|sapply(data_fou,class)=="Factor")
+
+var1.factor<-which(sapply(data_fou,class)=="factor")
+
+```
+
+
+```{r, echo = TRUE, eval=FALSE,warning=FALSE}
+
+names(var1.numeric)
+
+names(var1.factor)
+```
+
+```{r, echo = TRUE, eval=FALSE,warning=FALSE}
+# chargement de la librarie
+library(stargazer)
+#L'écart-type (standard déviation en anglais)
+stargazer(data_fou,summary.stat=c("n","min","p25","median","mean","p75","max","sd"),type = "text")
+```
+
+
+Nous retrouvons 1500 patterns et il y a 25% des observations qui ont des valeurs inférieures entre 0.046 et 0.275 au 1er quartile.
+Si la distribution est symétrique alors la médiane est égale à la moyenne. On voit ici que les valeurs sont proches. 
+On remarque que l'écart-type (qui est la racine carrée de la variance) est faible et qui correspond l’étalement des donnés autour de la valeur centrale “moyenne.
+Il y a 25% des patterns qui ont des valeurs supérieures entre 0.094 et 0.527 au 3ème quartile.
+
+
+2. mfeat-fac: 216 profile correlations
+
+
+```{r, echo = TRUE, eval=TRUE,warning=FALSE}
+data_fac = data_train[, c(1: 216,650)]
+var2.numeric<-which(sapply(data_fac,class)=="numeric"|sapply(data_fac,class)=="Factor")
+
+var2.factor<-which(sapply(data_fac,class)=="factor")
+```
+
+
+```{r, echo = TRUE, eval=FALSE,warning=FALSE}
+
+
+
+names(var2.numeric)
+names(var2.factor)
+```
+
+
+
+
+
+```{r, echo = TRUE,eval=FALSE, warning=FALSE}
+
+#L'écart-type (standard déviation en anglais)
+stargazer(data_fac,summary.stat=c("n","min","p25","median","mean","p75","max","sd"),type = "text")
+```
+On peut remarquer qu’aucune des variables n’est constante.On voit ici que les valeurs des moyennes et medianes sont proches. Les distributions sont en majorité symétrique. L'ecart type est très élevé et qui correspond à un grand étalement des valeurs.
+
+
+
+
+#### 4.1.1.2 Représentations graphiques
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes
+
+
+
+
+```{r,echo=FALSE, message=FALSE,eval=FALSE, fig.height=6, fig.width=6, warning=TRUE}
+#histogrammes
+
+mapply(data_fou[,var1.numeric],  FUN=function(xx,name){
+  hist(xx,main=name)}, name=var1.numeric)
+```
+
+
+
+On remarque que peu de variables suivent une loi normale mais on identifie quelques variables avec une distribution non-symétrique comme fou_2, fou_3, fou_8, fou_73, fou_74, fou_76.
+
+On repère ensuite les potentielles valeurs aberrantes par les boîtes à moustaches.
+
+
+```{r,echo=FALSE, message=FALSE,eval=FALSE, fig.align='center', fig.height=5, fig.width=5, warning=TRUE}
+library(car)
+mapply(data_fou[,var1.numeric],
+       FUN=function(xx,name){
+         Boxplot(xx,main=name)},
+       name=var1.numeric)
+```
+
+Il est difficile de prendre une décison sur les valeurs aberrantes mais en regardant les variables fou_2, fou_3, fou_8, fou_73, fou_74, fou_76, on ne retrouvent pas de valeurs supérieures au 3ème quartile.
+
+
+2. mfeat-fac: 216 profile correlations
+
+```{r,echo=FALSE, message=FALSE,eval=FALSE, fig.height=6, fig.width=6, warning=TRUE}
+#histogrammes
+
+mapply(data_fac[,var2.numeric],  FUN=function(xx,name){
+  hist(xx,main=name)}, name=var2.numeric)
+```
+
+On remarque que peu de variables suivent une loi normale mais on identifie quelques variables avec une distribution non-symétrique comme fac_168, fac_207, fac_117.
+On repère ensuite les potentielles valeurs aberrantes par les boîtes à moustaches.
+
+```{r,echo=FALSE, message=FALSE,eval=FALSE, fig.align='center', fig.height=5, fig.width=5, warning=TRUE}
+library(car)
+mapply(data_fac[,var2.numeric],
+       FUN=function(xx,name){
+         Boxplot(xx,main=name)},
+       name=var2.numeric)
+```
+
+Il est difficile de prendre une décison sur les valeurs aberrantes mais en regardant les variables fac_1, fac_2, fac_177, fac_190, fac_200, fac_204, fac_201, fac_199 fac_198 fac_192 à fac_187 fac_181 à fac_177, fac_167 fac_165 fac_164 fac_157 155 153 151 140 139 132 127 119 103 93 78 68 55 44 43 35 23 21 19 8 à 13 on ne retrouvent pas de valeurs supérieures aux extrèmes.
+
+
+
+
+## 4.2 Analyse bivariée
+
+Dans le cadre de notre objectif de prédiction, il convient prioritairement d'étudier le lien entre les variables explicatives et la réponse. 
+Afin d’identifier la nature du lien entre les variables quantitatives et la réponse, on regarde quelles sont les variables les plus liées à la classification des 1500 patterns du dataset.
+
+### 4.2.1 Identification des variables les plus discriminantes
+```{r,echo=FALSE, warning = FALSE, eval=TRUE, fig.align='center', fig.height=6, fig.width=8}
+#Chargement du package BioStatR
+library(BioStatR)
+```
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes
+```{r,echo=FALSE, warning = FALSE, eval=TRUE, fig.align='center', fig.height=6, fig.width=8, warning=TRUE}
+#calcul des rapport de corrélation
+res.eta2<-sapply(data_fou[,var1.numeric],eta2,y=data_fou$class)
+
+#tri par valeurs décroissantes
+res.eta2<-sort(res.eta2)
+
+#représentation
+par(mar=c(5, 15, 4, 2) + 0.1)#pour gérer les marges du graphique
+barplot1<-barplot(res.eta2,horiz = TRUE,las=2,xlab=expression(eta^2))
+```
+
+```{r,echo = TRUE}
+head(sort(res.eta2,decreasing = TRUE),30)
+```
+Parmi les variables quantitatives, les 10 liaisons les plus fortes sont observées pour les variables fou_2, fou_7, fou_76, fou_74, fou_73, fou_6 fou_1, fou_3 fou_8 . Au contraire, les variables fou_22, fou_32  et fou_25 n’apparaissent pas comme discriminantes.
+
+2. mfeat-fac: 216 profile correlations
+```{r,echo=FALSE, warning = FALSE, eval=TRUE, fig.align='center', fig.height=6, fig.width=8, warning=TRUE}
+#calcul des rapport de corrélation
+res2.eta2<-sapply(data_fac[,var2.numeric],eta2,y=data_fac$class)
+
+#tri par valeurs décroissantes
+res2.eta2<-sort(res2.eta2)
+
+#représentation
+par(mar=c(5, 15, 4, 2) + 0.1)#pour gérer les marges du graphique
+barplot2<-barplot(res2.eta2,horiz = TRUE,las=2,xlab=expression(eta^2))
+```
+```{r,echo = TRUE}
+head(sort(res2.eta2,decreasing = TRUE),60)
+```
+Parmi les variables quantitatives, les 10 liaisons les plus fortes sont observées pour les variables fac_181, fac_29, fac_1, fac_65, fac_55, fac_53, fac_67, fac_19, fac_7 fac_37, fac_2. Au contraire, les variables fac_60, fac_17  et fac_28 n’apparaissent pas comme discriminantes.
+
+
+#### 4.2.1.3 Allure des distributions conditionnelles
+
+La distribution des variables continues conditionnellement à la variable réponse est parfois déterminante pour l’utilisation de certains modèles, notamment l’analyse linéaire discriminante. On analyse donc la nature de ces distributions.
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes
+```{r, echo = TRUE,eval=TRUE,result='hide', warning=FALSE, fig.align = 'center', fig.height = 8, fig.width = 10}
+
+library(lattice);library(gridExtra)
+
+# distribution conditionnelle de fou_2
+plot1<-lattice::histogram(~fou_2|class,data=data_fou,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fou_7
+plot2<-lattice::histogram(~fou_7|class,data=data_fou,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fou_76
+plot3<-lattice::histogram(~fou_76|class,data=data_fou,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fou_74
+plot4<-lattice::histogram(~fou_74|class,data=data_fou,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fou_73
+plot5<-lattice::histogram(~fou_73|class,data=data_fou,type="density",col="lightblue",ylab="Densité")
+# affichage
+grid.arrange(plot1,plot2,plot3,plot4,plot5,nrow=2,ncol=3)
+```
+Les distributions conditionnelles des variables fou_2, fou_7, fou_76 sont normales. Cependant pour la classe 1 de la variable fou_74 et pour les classes 0 et 1 de la variable fou_73, les distribution ne sont pas normales.
+
+2. mfeat-fac: 216 profile correlations
+```{r, echo = TRUE,eval=TRUE,result='hide', warning=FALSE, fig.align = 'center', fig.height = 8, fig.width = 10}
+
+library(lattice);library(gridExtra)
+
+# distribution conditionnelle de fac_29
+plot1<-lattice::histogram(~fac_29|class,data=data_fac,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fac_1
+plot2<-lattice::histogram(~fac_1|class,data=data_fac,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fac_65
+plot3<-lattice::histogram(~fac_65|class,data=data_fac,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fac_55
+plot4<-lattice::histogram(~fac_55|class,data=data_fac,type="density",col="lightblue",ylab="Densité")
+# distribution conditionnelle de fac_53
+plot5<-lattice::histogram(~fac_53|class,data=data_fac,type="density",col="lightblue",ylab="Densité")
+# affichage
+grid.arrange(plot1,plot2,plot3,plot4,plot5,nrow=2,ncol=3)
+```
+Les distributions conditionnelles des variables fac_29, fac_1, fac_65,fac_55 , fac_53 sont normales. Cependant pour la classe 6 et 7 identifie clairement une queue à droite ou à gauche.
+
+### 4.2.2 Lien entre variables explicatives
+
+Des liaisons trop fortes entre variables explicatives peuvent conduire à de grande instabilité dans les modèles. L’analyse des liaisons entre variables explicatives permettra de détecter les couples de variables les plus liées.
+
+#### 4.2.2.1 Variables quantitatives
+
+On détermine les valeurs des coefficients de corrélation linéaire et de Spearman entre les variables quantitatives. Le test 
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes
+Voici la **matrice des corrélations** :
+```{r, echo = TRUE,eval=FALSE,warning=FALSE, fig.align = 'center', fig.height = 8, fig.width = 8}
+library(DescTools)
+matcram<-cor(data_fou[,var1.numeric])
+
+PlotCorr(matcram,
+         
+         breaks=seq(0, 1, length=21),cex.axis = 0.7, 
+         args.colorlegend = list(labels=sprintf("%.1f", seq(0, 1, length = 15)), frame=TRUE))
+text(x=rep(1:ncol(matcram),ncol(matcram)), y=rep(1:ncol(matcram),each=ncol(matcram)),
+     label=sprintf("%0.2f", matcram[,ncol(matcram):1]), cex=0.2, xpd=TRUE)
+```
+Nous n'observons pas de très fortes liaisons.
+
+Voici la matrice des **corrélations avec coefficient de spearman** :
+```{r, echo = TRUE,eval=FALSE,warning=FALSE, fig.align = 'center', fig.height = 8, fig.width = 8}
+matcor<-cor(data_fou[,var1.numeric],method = "spearman")
+PlotCorr(matcram,
+        
+         breaks=seq(0, 1, length=21),cex.axis = 0.7, 
+         args.colorlegend = list(labels=sprintf("%.1f", seq(0, 1, length = 15)), frame=TRUE))
+text(x=rep(1:ncol(matcor),ncol(matcor)), y=rep(1:ncol(matcor),each=ncol(matcor)),
+     label=sprintf("%0.2f", matcor[,ncol(matcor):1]), cex=0.3, xpd=TRUE)
+```
+On constate que les coefficients de corrélation et de Spearman sont plutôt proches  et que les liaisons ne sont pas très fortes. On ne s’attend donc pas à des problèmes de colinéarité entre ces variables.
+
+2. mfeat-fac: 216 profile correlations
+Voici la **matrice des corrélations** :
+```{r, echo = TRUE,eval=FALSE,warning=FALSE, fig.align = 'center', fig.height = 14, fig.width = 14}
+library(DescTools)
+matcram<-cor(data_fac[,var2.numeric])
+
+PlotCorr(matcram,
+         
+         breaks=seq(0, 1, length=21),cex.axis = 0.7, 
+         args.colorlegend = list(labels=sprintf("%.1f", seq(0, 1, length = 15)), frame=TRUE))
+text(x=rep(1:ncol(matcram),ncol(matcram)), y=rep(1:ncol(matcram),each=ncol(matcram)),
+     label=sprintf("%0.2f", matcram[,ncol(matcram):1]), cex=0.2, xpd=TRUE)
+```
+Nous n'observons pas de très fortes liaisons.
+
+Voici la matrice des **corrélations avec coefficient de spearman** :
+```{r, echo = TRUE,eval=FALSE,warning=FALSE, fig.align = 'center', fig.height = 14, fig.width = 14}
+matcor<-cor(data_fac[,var2.numeric],method = "spearman")
+PlotCorr(matcram,
+        
+         breaks=seq(0, 1, length=21),cex.axis = 0.7, 
+         args.colorlegend = list(labels=sprintf("%.1f", seq(0, 1, length = 15)), frame=TRUE))
+text(x=rep(1:ncol(matcor),ncol(matcor)), y=rep(1:ncol(matcor),each=ncol(matcor)),
+     label=sprintf("%0.2f", matcor[,ncol(matcor):1]), cex=0.3, xpd=TRUE)
+```
+On constate que les coefficients de corrélation et de Spearman sont plutôt proches  et que les liaisons ne sont pas très fortes. On ne s’attend donc pas à des problèmes de colinéarité entre ces variables.
+
+
+## 4.3 Analyse multivariée
+
+L’analyse multivariée va permettre notamment de résumer les liaisons entre les variables explicatives et d’identifier des groupes de patterns aux profils similaires. Les variables étant de natures différentes, on effectue d’abord une ACP puis un ACM après discrétisation des variables quantitatives que l’on complètera par une CAH effectuée sur les premières composantes.
+
+### 4.3.1 Analyse factorielle
+
+
+### 4.3.2 ACP sur les données quantitatives
+
+Nous effectuons une ACP sur les données quantitatives  en considérant class comme une variable supplémentaire.
+
+#### 1. mfeat-fou: 76 Fourier coefficients of the character shapes
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 4, fig.width = 5.5}
+library('FactoMineR')
+
+data_acp<-data_fou
+#data_acp$outcome<-as.integer(data_acp$outcome)
+res1.pca<-PCA(data_acp,quali.sup=77,graph = FALSE) #outcome est une variable supplémentaire, non intégrée dans l’acp avec class = position 77
+options(max.print = 1500)
+
+```
+**Distribution de l'inertie**
+
+L'inertie des axes factoriels indique d'une part si les variables sont structurées et suggére d'autre part le nombre judicieux de composantes principales à étudier.
+
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 7, fig.width = 7.5}
+par(mar = c(2.6, 4.1, 1.1, 2.1))
+#barplot(res.pca$eig[,2], names.arg = 1:nrow(res.pca$eig))
+fviz_eig(res1.pca, addlabels = TRUE, ylim = c(0, 18))
+```
+
+
+Pour la réduction du volume de données, on impose la conservation d’une qualité d’approximation des données initiales et avec 35 dimensions on a 82% des données. Pour le choix du nombre d’axes en ACP, les différences entre valeurs propres successives deviennent faibles après la 4eme dimension. On va alors garder 4 axes en ACP car les axes principaux suivants ne sont plus significatifs. On a 32.363% des données initiales.
+
+Dim.1   Dim.2   Dim.3   Dim.4   Dim.5   Dim.6     
+15.421   6.795   6.458   3.688  3.316   3.205   
+15.421  22.217  28.675  32.363  35.679  38.884
+
+
+**Figure 1 - Décomposition de l'inertie totale **
+
+Une estimation du nombre pertinent d'axes à interpréter suggére de restreindre l'analyse à la description des 2 premiers axes.
+
+**Description du plan 1:4**
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 2, fig.width = 5.5}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+#plot.PCA(res.pca, select = drawn, axes = 1:2, choix = 'ind', invisible = 'quali', title = '', cex = cex)
+fviz_contrib(res1.pca, choice = "ind", axes = 1:4, top = 10)+
+  theme(axis.text = element_text(size = 7.5))
+```
+
+
+
+**Description du plan 1:2**
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 2, fig.width = 5.5}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+#plot.PCA(res.pca, select = drawn, axes = 1:2, choix = 'ind', invisible = 'quali', title = '', cex = cex)
+fviz_contrib(res1.pca, choice = "ind", axes = 1:2, top = 10)+
+  theme(axis.text = element_text(size = 7.5))
+```
+**Description du plan 3:4**
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 2, fig.width = 5.5}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+#plot.PCA(res.pca, select = drawn, axes = 1:2, choix = 'ind', invisible = 'quali', title = '', cex = cex)
+fviz_contrib(res1.pca, choice = "ind", axes = 3:4, top = 10)+
+  theme(axis.text = element_text(size = 7.5))
+```
+
+
+```{r, echo = TRUE, eval=FALSE, warning=FALSE}
+data_fou[644,]$class
+data_fou[828,]$class
+data_fou[504,]$class
+data_fou[555,]$class
+data_fou[119,]$class
+data_fou[585,]$class
+data_fou[67,]$class
+data_fou[570,]$class
+data_fou[810,]$class
+data_fou[868,]$class
+
+
+```
+
+```{r, echo = TRUE, eval=FALSE, warning=FALSE}
+summary(res1.pca)
+```
+```{r}
+res1.pca$var
+```
+
+On retrouve les 7 patterns qui contribuent le plus à  la construction du plan. Ces patterns ont des valeurs extrémes par rapport à la moyenne des individus. Ils appartiennt tous à la class 0 sauf le patterns 644 qui appartient à la class 4
+**Figure 2 - Décomposition des contributions des patterns **
+
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 3, fig.width = 5.5}
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+fviz_pca_ind(res1.pca, label="none", habillage=data_fou$class, axes = 1:2,addEllipses=TRUE, ellipse.level=0.95)
+
+```
+**Figure 3 - Graphe des patterns (ACP)**
+*Les patterns libellés sont ceux ayant la plus grande contribution é la construction du plan.*
+*Les patterns sont colorés selon leur appartenance aux modalités de la variable* CLASS.
+
+On a nos 10 classes.
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 9, fig.width = 14.5}
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+fviz_pca_var(res1.pca, axes = 1:2,select.var = list(contrib = 10),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")
+```
+**Figure 4.1 - Graphe des variables (ACP)**
+*Les variables libellées sont celles les mieux représentées sur le plan 1:2.*
+On a les variables fou_5, (fou_11,fou_73), (fou69,fou_13), (fou_11,fou_3) fou_76, fou_18,  fou_16 et  qui contribuent le plus et les varaibles fou_11 fou_69, fou_3, fou_73 et fou_13 sont très corrélées.
+
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 6, fig.width = 8.5}
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+fviz_pca_var(res1.pca, axes = 3:4,select.var = list(contrib =11),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")
+```
+**Figure 4.2 - Graphe des variables (ACP)**
+*Les variables libellées sont celles les mieux représentées sur le plan 3:4.*
+On a les variables fou_7, (fou_71, fou_73), (fou_14 fou_9),( fou_8,fou_3) fou_74, fou_75 fou_1 fou_17 contribuent le plus et les varaibles (fou_71, fou_73), (fou_14 fou_9),( fou_8,fou_3) sont très corrélées.
+
+
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+summary(res1.pca)
+```
+
+
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+
+# Contributions des variables à PC1
+fviz_contrib(res1.pca, choice = "var", axes = 1, top = 10)
+# Contributions des variables à PC2
+fviz_contrib(res1.pca, choice = "var", axes = 2, top = 10)
+# Contributions des variables à PC3
+fviz_contrib(res1.pca, choice = "var", axes = 3, top = 10)
+# Contributions des variables à PC4
+fviz_contrib(res1.pca, choice = "var", axes = 4, top = 10)
+# Contributions des variables à PC5
+fviz_contrib(res1.pca, choice = "var", axes = 1:4, top = 20)
+
+
+
+```
+
+
+Les éléments les plus intéressants qui ressortent de l'ACP nous montre que :
+
+- la première composante est essentiellement liée à fou69,fou_11, fou_76, fou_13, fou_73, (fou_3, fou_8 et fou_18)
+
+- la deuxième à fou_5 (fou_64 fou_70 et fou_30)
+
+- la troisème à fou_7 fou_71, fou_9  (et fou_14) fou_8
+
+- La quatrième fou_75, fou_69 (fou_35)
+
+
+
+Enfin, sur chacune de ces trois composantes, les modalités de class ont des coordonnées significativement différentes, respectivement pour les classe 0 (-5.501 3.136 1.813), 1  (-0.941 -1.539 -1.109),  2 (-1.320 -1.240 -1.832), 3 (1.905 -2.113 0.766 ), 4 (2.534 0.304 0.954 ), 5 (2.021 -0.044 3.212 ), 6 (2.278 0.830 -0.583 ), 7 (2.100 0.710 -2.918 ), 8 (-5.200 -0.685 -0.027) et 9 (2.124 0.641 -0.276). 
+Les cos2 des deux premières composantes sont assez élevés par exemple pour la classe 0 ( 0.631 et 0.205), mais faible pour la troisième.
+
+Nous pouvons conclure pour notre prédiction que les variables quantitatives sont fou69,fou_11, fou_76, fou_13, fou_73, fou_3, fou_8 et fou_18,fou_5 fou_64 fou_70 et fou_30 et fou_7 fou_71, fou_9  et fou_14 les plus susceptibles de contribuer à la qualité d'un modèle de prédiction avec les correlations.
+
+
+Nous pouvons conclure pour notre prédiction que les variables quantitatives sont fou69,fou_11, fou_76,fou_5 ,fou_7 fou_71,fou_9 fou_8 fou_17 fou_74 fou_75 les plus susceptibles de contribuer à la qualité d'un modèle de prédiction.
+
+
+
+On fait un test de correlation de Pearson et Spearman pour verifier si corrélation.
+```{r, echo = TRUE, warning=FALSE}
+###  Correlation  de  Pearso
+cor.test(data_fou$fou_5,data_fou$fou_69)
+
+```
+Le p-value = 9.338e-09, il n'y a pas de lien en fou_69 et fou_5
+```{r, echo = TRUE, warning=FALSE}
+###  Correlation  de  Spearman
+cor.test(data_fou$fou_13,data_fou$fou_69,method="spearman")
+```
+Le p-value <2.2e-16, il y a lien en fou_69 et fou_13
+
+#### 2. mfeat-fac: 216 profile correlations
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 4, fig.width = 5.5}
+library('FactoMineR')
+
+data_acp2<-data_fac
+#data_acp$outcome<-as.integer(data_acp$outcome)
+res2.pca<-PCA(data_acp2,quali.sup=217,graph = FALSE) #outcome est une variable supplémentaire, non intégrée dans l’acp avec class = position 77
+options(max.print = 1500)
+
+```
+**Distribution de l'inertie**
+
+L'inertie des axes factoriels indique d'une part si les variables sont structurées et suggére d'autre part le nombre judicieux de composantes principales à étudier. 
+Les 2 premiers axes de l'ACP expriment 37.6% de l'inertie totale du jeu de données. Les 12 premieres dimensins représente 82% de l'information initiale.
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 4, fig.width = 7.5}
+par(mar = c(2.6, 4.1, 1.1, 2.1))
+#barplot(res.pca$eig[,2], names.arg = 1:nrow(res.pca$eig))
+fviz_eig(res2.pca, addlabels = TRUE, ylim = c(0, 24))
+```
+Pour la réduction du volume de données, on impose la conservation d’une qualité d’approximation des données initiales et avec 12 dimensions on a 82% des données. Pour le choix du nombre d’axes en ACP, les différences entre valeurs propres successives deviennent faibles après la 4eme dimension. On va alors garder 5 axes en ACP car les axes principaux suivants ne sont plus significatifs. On a 63.114% des données initiales.
+
+Dim.1   Dim.2   Dim.3   Dim.4   Dim.5   Dim.6   Dim.7   
+22.542  15.064  11.809   7.831   5.868   4.967   3.515
+22.542  37.606  49.415  57.246  63.114  68.080  71.596
+
+
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+summary(res2.pca )
+```
+```{r}
+#sort(res2.pca$var$contrib,decreasing = TRUE)
+res2.pca$var$contrib
+head (res2.pca$ind$coord, n = 10) %>% round (digits = 2)
+```
+
+**Figure 1 - Décomposition de l'inertie totale **
+
+
+
+**Description du plan 1:2**
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 2, fig.width = 5.5}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+#plot.PCA(res.pca, select = drawn, axes = 1:2, choix = 'ind', invisible = 'quali', title = '', cex = cex)
+fviz_contrib(res2.pca, choice = "ind", axes = 1:5, top = 10)+
+  theme(axis.text = element_text(size = 7.5))
+```
+
+```{r, echo = TRUE, eval=FALSE, warning=FALSE}
+data_fac[485,]$class
+data_fac[1022,]$class
+data_fac[606,]$class
+data_fac[1102,]$class
+data_fac[905,]$class
+data_fac[689,]$class
+data_fac[1045,]$class
+data_fac[721,]$class
+data_fac[1195,]$class
+data_fac[909,]$class
+
+
+```
+
+
+
+
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+
+# Contributions des variables à PC1
+fviz_contrib(res2.pca, choice = "var", axes = 1, top = 10)
+# Contributions des variables à PC2
+fviz_contrib(res2.pca, choice = "var", axes = 2, top = 10)
+# Contributions des variables à PC3
+fviz_contrib(res2.pca, choice = "var", axes = 3, top = 10)
+# Contributions des variables à PC4
+fviz_contrib(res2.pca, choice = "var", axes = 4, top = 10)
+# Contributions des variables à PC5
+fviz_contrib(res2.pca, choice = "var", axes = 5, top = 10)
+
+```
+
+On retrouve les 7 variables qui contribuent le plus à  la construction du plan. 
+
+dim1: fac_55, fac_67, fac_181, fac_109 fac_19 , (fac_26 fac_7 fac_84)
+
+dim2: fac_196 fac_4 fac_100 fac_148 fac_136 (fac_40)
+
+dim3: fac_31 fac_174 fac_66 fac_150 fac_37 (fac_123 fac_126
+
+dim4: fac_175 fac_163 fac_90 (fac_102 fac_18) 
+
+dim5: fac_205 fac_180 fac_99 fac_72 fac_192 fac_195 fac_216
+
+
+
+**Figure 2 - Décomposition des contributions des patterns **
+
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 3, fig.width = 5.5}
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+fviz_pca_ind(res2.pca, label="none", habillage=data_fou$class, axes = 1:2,addEllipses=TRUE, ellipse.level=0.95)
+
+```
+**Figure 3 - Graphe des patterns (ACP)**
+*Les patterns libellés sont ceux ayant la plus grande contribution é la construction du plan.*
+*Les patterns sont colorés selon leur appartenance aux modalités de la variable* CLASS.
+
+On a nos 10 classes qui sont tous regroupées.
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 12, fig.width = 12}
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+fviz_pca_var(res2.pca, axes = 1:2,select.var = list(contrib = 10),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")
+```
+**Figure 4 - Graphe des variables (ACP)**
+*Les variables libellées sont celles les mieux représentées sur le plan.*
+
+On a les variables (fac_55,fac_67) (fac_50, fac_38), fac_26,  ,(fac_196,fac_4) fac_136,fac_16,fac_97 qui contribuent le plus et les varaibles fac sont très corrélées.
+Les éléments les plus intéressants qui ressortent de l'ACP nous montre que :
+
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 10, fig.width = 10}
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+fviz_pca_var(res2.pca, axes = 3:4,select.var = list(contrib = 10),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")
+```
+**Figure 4 - Graphe des variables (ACP)**
+*Les variables libellées sont celles les mieux représentées sur le plan.*
+
+On a les variables fac_174 (fac_138 fac_90,fac_102,fac_18 ) ,(fac_66,fac150),(fac_162,fac_126) fac_31 qui contribuent le plus et les varaibles fac sont très corrélées.
+
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 10, fig.width = 10}
+
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+fviz_pca_var(res2.pca, axes = 4:5,select.var = list(contrib = 18),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")
+```
+
+
+Pour l'axe 5, on a les variables fac_103 fac_205 fac_180 qui contribuent le plus et les varaibles fac sont très corrélées.
+
+Nous pouvons conclure pour notre prédiction que les variables quantitatives sont 
+fac_55, fac_196 ,fac_136, fac_31 fac_174 fac_90, fac_66 fac_205 fac_180 fac_175 fac_163
+
+### 4.3.3 ACM sur les données quantitatives
+
+
+#### 1. mfeat-fou: 76 Fourier coefficients of the character shapes
+
+On réalise l'ACM en mettant la variable class en variable illustrative.
+On gère les modalités rares (fréquence relative <5%) en effectuant de la ventilation.
+On voit qu'on a un peu près 1400 valeurs différentes dans chaque variable en utilisant *describe()*. L’ACM étant sensible aux modalités rares, on opte pour un découpage quantiles en 4 classes.
+```{r,eval=FALSE,echo = TRUE}
+# nb valeur par variables quantitatives (quand elles prennent un nombre de valeurs supérieure à 10) 
+describe(data_fou)
+```
+
+
+
+```{r,eval=TRUE,echo = TRUE}
+# discrétisation en 4 classes des variables quantitatives (quand elles prennent un nombre de valeurs supérieure à 10) 
+don.cat<-data_fou
+```
+
+```{r,eval=TRUE,echo = TRUE}
+for(i in which(sapply(data_fou,is.numeric))){
+  if(length(table(don.cat[[i]]))>10){
+    breaks<-c(-Inf,quantile(don.cat[[i]],
+                            na.rm=T)[-1])
+    don.cat[[i]]<-cut(don.cat[[i]],
+                      breaks=breaks,labels=F);
+  }
+  don.cat[[i]]<-as.factor(don.cat[[i]])
+}
+
+str(don.cat$fou_1)
+str(don.cat$fou_2)
+str(don.cat$fou_3)
+str(don.cat$fou_4)
+```
+Voici un exemple de discrétisation en 4 classes.
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 4, fig.width = 5.5}
+
+
+
+res.mca<- MCA(don.cat,graph=FALSE,quali.sup = ncol(don.cat),level.ventil = 0.05)#
+#res.mca<-MCA(Census,graph=FALSE,quali.sup=ncol(don.cat),level.ventil = 0.05)
+
+#On affiche les graphiques relatifs au premier plan
+```
+
+**Voici le graphe des patterns**
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 3, fig.width = 5}
+grp <- as.factor(data_fou[, "class"])
+fviz_mca_ind(res.mca, label="none", habillage=grp, addEllipses=TRUE, ellipse.level=0.95)
+```
+On voit que les groupes 0 et 7 sont éloignés des autres.
+
+**Voici le graphe des variables avec class**
+```{r,echo=FALSE, eval=TRUE,warning = FALSE,fig.align = 'center', fig.height = 8, fig.width = 10}
+p1<-fviz_mca_var (res.mca, choice = "mca.cor",jitter = list(what = "all",width = 0.1, height = 0.15,habillage=grp),
+            repel = TRUE, labelsize=3,
+            ggtheme = theme_minimal ())
+
+
+p1
+```
+
+On remarque que fou_5 est séparé du groupe et que la variable class est séparée.
+
+
+**Voici le graphe avec les modalités**
+
+On prend les 30 variables qui contribuent le plus.
+
+
+```{r,echo=FALSE, eval=TRUE,warning = FALSE,fig.align = 'center', fig.height = 3, fig.width = 7}
+p2<-fviz_mca_var(res.mca,labelsize=3,select.var = list(contrib = 30),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")+ scale_color_gradient2(low = "white", mid = "blue",high = "yellow", midpoint = 2)+theme_minimal()
+                
+p2 <- fviz_add(p2, res.mca$quali.sup$coord, color = "green")
+p2
+```
+
+L'exploitation visuelle permet de mettre en évidence les contributions les plus fortes à cette dimension sont fou_5, fou_2, fou_3, fou_69, fou_8, fou_16 fou_73 et fou_76 mais le dim 1 et 2 ne représente que 8.1 % des données.
+
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+describe(res.mca)
+```
+
+
+#### 2. mfeat-fac: 216 profile correlations
+
+On a entre 15 et 512 valeurs unique dans les variable fac donc on peut faire une discrétisation en 4 classes des variables quantitatives.
+```{r,eval=FALSE,echo = TRUE}
+# nb valeur par variables quantitatives (quand elles prennent un nombre de valeurs supérieure à 10) 
+describe(data_fac)
+```
+
+
+
+```{r,eval=TRUE,echo = TRUE}
+# discrétisation en 4 classes des variables quantitatives (quand elles prennent un nombre de valeurs supérieure à 10) 
+don.cat2<-data_fac
+```
+
+```{r,eval=TRUE,echo = TRUE}
+for(i in which(sapply(data_fac,is.numeric))){
+  if(length(table(don.cat2[[i]]))>10){
+    breaks<-c(-Inf,quantile(don.cat2[[i]],
+                            na.rm=T)[-1])
+    don.cat2[[i]]<-cut(don.cat2[[i]],
+                      breaks=breaks,labels=F);
+  }
+  don.cat2[[i]]<-as.factor(don.cat2[[i]])
+}
+
+str(don.cat2$fac_1)
+str(don.cat2$fac_2)
+str(don.cat2$fac_3)
+str(don.cat2$fac_4)
+```
+Voici un exemple de discrétisation en 4 classes.
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 4, fig.width = 5.5}
+
+
+
+res2.mca<- MCA(don.cat2,graph=FALSE,quali.sup = ncol(don.cat2),level.ventil = 0.05)#
+#res.mca<-MCA(Census,graph=FALSE,quali.sup=ncol(don.cat),level.ventil = 0.05)
+
+#On affiche les graphiques relatifs au premier plan
+```
+
+**Voici le graphe des patterns**
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 3, fig.width = 5}
+grp <- as.factor(data_fac[, "class"])
+fviz_mca_ind(res2.mca, label="none", habillage=grp, addEllipses=TRUE, ellipse.level=0.95)
+```
+On voit que les groupes 0 et 7 sont éloignés des autres.
+
+**Voici le graphe des variables avec class**
+```{r,echo=FALSE, eval=TRUE,warning = FALSE,fig.align = 'center', fig.height = 10, fig.width = 10}
+p1<-fviz_mca_var (res2.mca, choice = "mca.cor",jitter = list(what = "all",width = 0.1, height = 0.15,habillage=grp),
+            repel = TRUE, labelsize=3,
+            ggtheme = theme_minimal ())
+
+
+p1
+```
+fac_208 fac_136 fac_181 fac_2 fac_33 fac185 fac_100 fac_65 fac_109 fac_165 fac_105 fac_117
+
+
+On remarque que tout est concentré.
+
+
+**Voici le graphe avec les modalités**
+
+On prend les 30 variables qui contribuent le plus.
+
+
+```{r,echo=FALSE, eval=TRUE,warning = FALSE,fig.align = 'center', fig.height = 3, fig.width = 7}
+p2<-fviz_mca_var(res2.mca,labelsize=3,select.var = list(contrib = 30),jitter = list(what = "both",width = 0.1, height = 0.15) ,col.var = "contrib")+ scale_color_gradient2(low = "white", mid = "blue",high = "yellow", midpoint = 2)+theme_minimal()
+                
+p2 <- fviz_add(p2, res2.mca$quali.sup$coord, color = "green")
+p2
+```
+
+L'exploitation visuelle permet de mettre en évidence aucunes contributions forte mais le dim 1 et 2 ne représente que 12.4 % des données.
+
+
+
+### 4.3.4 Classification
+
+On complète cette analyse par une CAH sur les composantes de l’ACM. Le calcul de l'inertie inter-classe avec 10 groupes.
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes
+```{r, echo = TRUE, fig.align = 'center', fig.height = 4, fig.width = 6.5}
+
+set.seed(0)
+
+# Choix du nombre de composantes
+ncp<-which(res.mca$eig[,3]>80)[1]
+
+# On effectue l'ACM en conservant les 32 premières dimensions 
+res.mca<-MCA(don.cat,graph=FALSE,quali.sup=ncol(don.cat),level.ventil = 0.05,ncp=ncp)
+
+# On effectue la CAH (avec 10 classes d'après le diagramme des gains d'inertie)
+res.cah<-HCPC(res.mca,nb.clust=10,graph=FALSE, description = FALSE)
+
+# On affiche le dendogramme
+plot(res.cah, choice="tree")
+```
+
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 3, fig.width = 6}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+plot.HCPC(res.cah, choice = 'map', draw.tree = FALSE, select = drawn)
+
+```
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 3.5, fig.width = 6}
+# On représente les classes sur le graphe de l'ACM
+set.seed(0)
+res.mca.clust<-MCA(res.cah$data.clust,
+                   graph=FALSE,
+                   quali.sup=c(ncol(don.cat),ncol(res.cah$data.clust)),
+                   level.ventil = 0.05)
+plot.MCA(res.mca.clust,
+         habillage = ncol(res.cah$data.clust),
+         choix="ind",invisible=c("ind","var"))
+```
+On voit que chaque classe est proche d'un cluster et que les clesses 3 , 7, 5 ,4 ,9 et 6 sont proches. 
+
+2. mfeat-fac: 216 profile correlations
+```{r, echo = TRUE, fig.align = 'center', fig.height = 4, fig.width = 6.5}
+
+set.seed(0)
+
+# Choix du nombre de composantes
+ncp<-which(res2.mca$eig[,3]>80)[1]
+
+# On effectue l'ACM en conservant les 32 premières dimensions 
+res2.mca<-MCA(don.cat2,graph=FALSE,quali.sup=ncol(don.cat2),level.ventil = 0.05,ncp=ncp)
+
+# On effectue la CAH (avec 10 classes d'après le diagramme des gains d'inertie)
+res2.cah<-HCPC(res2.mca,nb.clust=10,graph=FALSE, description = FALSE)
+
+# On affiche le dendogramme
+plot(res2.cah, choice="tree")
+```
+
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 3, fig.width = 6}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+plot.HCPC(res2.cah, choice = 'map', draw.tree = FALSE, select = drawn)
+
+```
+
+```{r, echo = TRUE, fig.align = 'center', fig.height = 3.5, fig.width = 6}
+# On représente les classes sur le graphe de l'ACM
+set.seed(0)
+res2.mca.clust<-MCA(res2.cah$data.clust,
+                   graph=FALSE,
+                   quali.sup=c(ncol(don.cat2),ncol(res2.cah$data.clust)),
+                   level.ventil = 0.05)
+plot.MCA(res2.mca.clust,
+         habillage = ncol(res2.cah$data.clust),
+         choix="ind",invisible=c("ind","var"))
+```
+On voit que chaque classe est proche d'un cluster et que les classes 3 , 7, 5 ,4 ,9 et 2 sont proches. 
+
+# 5 Pré-traitement
+## 5.1 Transformations
+
+Il n'y aura pas de découpage par classes car nous avons un peu près 1400 valeurs uniques par variables car il ne permet pas de voir les valeurs extrèmes ou abberrantes qui peuvent caractériser une classe.
+
+## 5.2 Réduction des données
+### 5.2.1 En lignes
+
+
+On ne va pas réduire le nombre de lignes car nous avons seulement 1500 patterns.
+
+### 5.2.2 En colonnes
+
+
+Sur le choix des variables, nous pouvons conclure grâce à l'ACP et ACM que nous garderons les variables mfeat-fou suivantes pour notre prédiction :
+
+11 composantes
+Nous pouvons conclure pour notre prédiction que les variables quantitatives sont 
+fou69,fou_11, fou_76,fou_5 ,fou_7 fou_71,fou_9 fou_8 fou_17 fou_74 fou_75
+
+
+8 composantes
+ fou_5, fou_2, fou_3, fou_69, fou_8, fou_73, fou_16 et fou_76
+ 
+ ou 
+ 
+ 16 composantes
+ fou69,fou_11, fou_76, fou_13, fou_73, fou_3, fou_8 et fou_18,fou_5 fou_64 fou_70 et fou_30 et fou_7 fou_71, fou_9  et fou_14 
+ 
+ 
+```{r, echo = TRUE, eval=TRUE}
+data_fou0<- data_fou[,c(69,11,76,5,7,71,9,8,17,74,75,77)] 
+data_fou1<- data_fou[,c(2,3,5,8,16,69,73,76,77)] 
+data_fou2<- data_fou[,c(5,3,7,8,9,11,13,14,18,30,64,69,71,73,76,77)] 
+#str(data_fou0)
+#str(data_fou1)
+#str(data_fou2)
+
+```
+
+ 
+ 
+ 
+ On a les variables (fac_55,fac_67) (fac_50, fac_98), fac_26,  ,(fac_197,fac_4) fac_136,fac_16,fac_97
+ 
+dim1: fac_55, fac_67, fac_181, fac_109 fac_19 , (fac_26 fac_7 fac_84)
+
+dim2: fac_196 fac_4 fac_100 fac_148 fac_136 (fac_40)
+
+dim3: fac_31 fac_174 fac_66 fac_150 fac_37 (fac_123 fac_126
+
+dim4: fac_175 fac_163 fac_90 (fac_102 fac_18) 
+
+dim5: fac_205 fac_180 fac_99 fac_72 fac_192 fac_195 fac_216
+
+ 
+ 
+```{r, echo = TRUE, eval=TRUE}
+data_fac0<- data_fac[,c(55,196,136,31,174,90,66,205,180,175,163,217)] 
+data_fac1<- data_fac[,c(55,50,26,197,136,16,97,217)] 
+data_fac2<- data_fac[,c(55,67,196,4,31,174,175,163,205,180,181,109,100,148,66,150,90,102,99,72,192,195,18,37,123,126,136,40,26,7,84,217)] 
+#str(data_fac0)
+#str(data_fac1)
+#str(data_fac2)
+
+
+```
+ 
+ 
+ 11 composantes
+Nous pouvons conclure pour notre prédiction que les variables quantitatives sont 
+fac_55, fac_196 ,fac_136, fac_31 fac_174 fac_90, fac_66 fac_205 fac_180 fac_175 fac_163
+ 
+ 
+ 
+ 26 composantes
+
+fac_55	fac_67	fac_181	fac_109	fac_19	(fac_26	fac_7)
+fac_196	fac_4	fac_100	fac_148	fac_136	(fac_40)	
+fac_31	fac_174	fac_66	fac_150	fac_37	(fac_123	fac_126)
+fac_175	fac_163	fac_90	(fac_102	fac_18)		
+fac_205	fac_180	fac_99	fac_72	fac_192	fac_195	fac_216
+
+
+ ou
+ 
+ 60 composantes
+ fac_181	fac_29	fac_1	fac_133	fac_65	fac_97	fac_109	fac_185	fac_55	fac_53	fac_113	fac_67
+fac_125	fac_19	fac_7	fac_108	fac_157	fac_84	fac_37	fac_207	fac_111	fac_135	fac_2	fac_199
+fac_146	fac_94	fac_193	fac_123	fac_13	fac_43	fac_195	fac_183	fac_12	fac_147	fac_3	fac_184
+fac_198	fac_41	fac_50	fac_132	fac_22	fac_91	fac_194	fac_177	fac_120	fac_154	fac_186	fac_204
+fac_165	fac_38	fac_86	fac_112	fac_26	fac_10	fac_115	fac_190	fac_106	fac_144	fac_33	fac_57
+
+
+ Nous gardons finalement 16 variables explicatives et outcome, donc 17 variables pour commencer la modélisation.
+
+```{r, echo = TRUE, eval=FALSE, cache=TRUE}
+#str(Census)
+```
+
+
+
+Nous avons créé des nouveaux jeux de données **data_fou0, data_fou1 et data_fou2**
+Nous avons créé des nouveaux jeux de données **data_fac0, data_fac1 et data_fac2** 
+
+
+
+ 
+# 6 prédiction
+
+## 6.1 Découpage des jeux de données apprentissage et Test
+
+
+Pour détecter un sur-apprentissage, nous allons diviser les données en deux sous-ensembles, données apprentissage et test-validation. Pour cela, il suffit de découper notre jeu de données en deux (soit 30% pour les données de test-validation et 70% pour l’apprentissage).
+
+Nous allons vérifier les colonnes avec des valeurs manquantes NA
+```{r, echo=FALSE, eval=TRUE, cache=TRUE}
+#verification
+data_fou = data_train[, c(217: 292,650)]
+data_fou0<- data_fou[,c(69,11,76,5,7,71,9,8,17,74,75,77)] 
+data_fou1<- data_fou[,c(2,3,5,8,16,69,73,76,77)] 
+data_fou2<- data_fou[,c(5,3,7,8,9,11,13,14,18,30,64,69,71,73,76,77)] 
+#str(data_fou)
+#str(data_fou1)
+#str(data_fou2)
+```
+
+```{r, echo = TRUE, eval=TRUE}
+data_fac = data_train[, c(1: 216,650)]
+data_fac0<- data_fac[,c(55,196,136,31,174,90,66,205,180,175,163,217)] 
+data_fac1<- data_fac[,c(55,50,26,197,136,16,97,217)] 
+data_fac2<- data_fac[,c(55,67,196,4,31,174,175,163,205,180,181,109,100,148,66,150,90,102,99,72,192,195,18,37,123,126,136,40,26,7,84,217)] 
+#str(data_fac)
+#str(data_fac1)
+#str(data_fac2)
+
+
+```
+
+
+
+Ensuite, nous divisons l'ensemble de données apprentissage et Test.
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+train = sample(c(TRUE, FALSE), size = nrow(data_fou), replace = TRUE, prob = c(0.7, 0.2))
+train1 = sample(c(TRUE, FALSE), size = nrow(data_fou1), replace = TRUE, prob = c(0.7, 0.2))
+train2 = sample(c(TRUE, FALSE), size = nrow(data_fou2), replace = TRUE, prob = c(0.7, 0.2))
+train0 = sample(c(TRUE, FALSE), size = nrow(data_fou0), replace = TRUE, prob = c(0.7, 0.2))
+
+small_train_data0 = data_fou0[train0,]
+validation_data0 = data_fou0[!train0,]
+small_train_data = data_fou[train,]
+validation_data = data_fou[!train,]
+small_train_data1 = data_fou1[train1,]
+validation_data1 = data_fou1[!train1,]
+small_train_data2 = data_fou2[train2,]
+validation_data2 = data_fou2[!train2,]
+```
+
+Ensuite, nous divisons l'ensemble de données apprentissage et Test.
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+train = sample(c(TRUE, FALSE), size = nrow(data_fac), replace = TRUE, prob = c(0.7, 0.2))
+train1 = sample(c(TRUE, FALSE), size = nrow(data_fac1), replace = TRUE, prob = c(0.7, 0.2))
+train2 = sample(c(TRUE, FALSE), size = nrow(data_fac2), replace = TRUE, prob = c(0.7, 0.2))
+train0 = sample(c(TRUE, FALSE), size = nrow(data_fou0), replace = TRUE, prob = c(0.7, 0.2))
+
+small_train_data01 = data_fac0[train0,]
+validation_data01 = data_fac0[!train0,]
+small_train_data00 = data_fac[train,]
+validation_data00 = data_fac[!train,]
+small_train_data11 = data_fac1[train,]
+validation_data11 = data_fac1[!train,]
+small_train_data21 = data_fac2[train2,]
+validation_data21 = data_fac2[!train2,]
+```
+
+
+On transforme notre dataset Test grace aux 12 composantes principales
+
+
+```{r, echo = TRUE, eval=TRUE,warning=FALSE}
+acp_train  <- NULL
+n_dim=12
+data_pix <- data_train[, c(1: 216,650)]
+data_pix <- data_fac
+columnNumber <- which(colnames(data_pix)=="class")
+data_pix <- data_pix[,c(columnNumber,1:ncol(data_pix)-1)]# put this class to column 1
+#head(data_pix, n = 10L)
+
+
+## 75% of the sample size
+smp_size.pix <- floor(0.75 * nrow(data_pix))
+set.seed(123)
+train_ind.pix <- sample(seq_len(nrow(data_pix)), size = smp_size.pix)
+data_pix.train <- data_pix[train_ind.pix, ]
+data_pix.test <- data_pix[-train_ind.pix, ]
+
+PCA1=prcomp(data_pix.train[,(2:ncol(data_pix.train))],center = T,scale. = F)
+projected=scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+acp_train <-scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+acp_train <-acp_train[,1:n_dim]
+acp_train = cbind(acp_train, replicate(1,data_pix.train$class))
+
+colnames(acp_train)[ncol(acp_train)] <- "class"
+acp_train_dt <- as.data.frame(acp_train)
+
+acp_train_dt <- acp_train_dt[,c(n_dim+1,1:ncol(acp_train_dt)-1)]## class to first colummn
+
+acp_train_dt[] <- lapply(acp_train_dt, function(x) as.numeric(as.character(x)))##convert to numeric all the fields
+acp_train_dt$class <- as.factor(acp_train_dt$class)## convert to factor class
+
+acp_test <- NULL
+acp_test <- predict(PCA1, newdata=data_pix.test[,(2:ncol(data_pix.test))])
+acp_test <-acp_test[,1:n_dim]
+acp_test = cbind(acp_test, replicate(1,data_pix.test$class))
+colnames(acp_test)[ncol(acp_test)] <- "class"
+library(reshape)
+
+
+acp_test_dt <- as.data.frame(acp_test)
+acp_test_dt <- acp_test_dt[,c(n_dim+1,1:ncol(acp_test_dt)-1)]## class to first colummn
+
+acp_test_dt[] <- lapply(acp_test_dt, function(x) as.numeric(as.character(x)))##convert to numeric all the fields
+acp_test_dt$class <- as.factor(acp_test_dt$class)## convert to factor class
+
+small_train_data31<-acp_train_dt
+validation_data31<-acp_test_dt
+
+```
+
+On transforme notre dataset Test grace aux 35 composantes principales
+
+
+```{r, echo = TRUE, eval=TRUE,warning=FALSE}
+acp_train  <- NULL
+n_dim=35
+data_pix <- data_train[, c(1: 216,650)]
+data_pix <- data_fac
+columnNumber <- which(colnames(data_pix)=="class")
+data_pix <- data_pix[,c(columnNumber,1:ncol(data_pix)-1)]# put this class to column 1
+#head(data_pix, n = 10L)
+
+
+## 75% of the sample size
+smp_size.pix <- floor(0.75 * nrow(data_pix))
+set.seed(123)
+train_ind.pix <- sample(seq_len(nrow(data_pix)), size = smp_size.pix)
+data_pix.train <- data_pix[train_ind.pix, ]
+data_pix.test <- data_pix[-train_ind.pix, ]
+
+PCA1=prcomp(data_pix.train[,(2:ncol(data_pix.train))],center = T,scale. = F)
+projected=scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+acp_train <-scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+acp_train <-acp_train[,1:n_dim]
+acp_train = cbind(acp_train, replicate(1,data_pix.train$class))
+
+colnames(acp_train)[ncol(acp_train)] <- "class"
+acp_train_dt <- as.data.frame(acp_train)
+
+acp_train_dt <- acp_train_dt[,c(n_dim+1,1:ncol(acp_train_dt)-1)]## class to first colummn
+
+acp_train_dt[] <- lapply(acp_train_dt, function(x) as.numeric(as.character(x)))##convert to numeric all the fields
+acp_train_dt$class <- as.factor(acp_train_dt$class)## convert to factor class
+
+acp_test <- NULL
+acp_test <- predict(PCA1, newdata=data_pix.test[,(2:ncol(data_pix.test))])
+acp_test <-acp_test[,1:n_dim]
+acp_test = cbind(acp_test, replicate(1,data_pix.test$class))
+colnames(acp_test)[ncol(acp_test)] <- "class"
+library(reshape)
+
+
+acp_test_dt <- as.data.frame(acp_test)
+acp_test_dt <- acp_test_dt[,c(n_dim+1,1:ncol(acp_test_dt)-1)]## class to first colummn
+
+acp_test_dt[] <- lapply(acp_test_dt, function(x) as.numeric(as.character(x)))##convert to numeric all the fields
+acp_test_dt$class <- as.factor(acp_test_dt$class)## convert to factor class
+
+small_train_data3<-acp_train_dt
+validation_data3<-acp_test_dt
+
+```
+
+
+
+
+### 6.2 Classification Tree CART
+
+On va utiliser les fonctions sélectionnées dans le modèle rpart pour l'algorithme CART car il est facile d'utilisation pour un arbre binaire. Et pour la variable outcome la prédiction est binaire. 
+
+CART
+
+  method = 'rpart2'
+
+Type: Regression, Classification
+
+Tuning parameters:
+
+    - maxdepth (Max Tree Depth)
+
+Required packages: rpart
+
+
+#### **Fine-Tuning avec recherche des Hyperparameters avec repeated Cross Validation et Grid Search**
+
+Nous utilisons le paramètre number=10 et avec répétitions repeats=5 car le temps d'execution est rapide. 
+
+### fou
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree = Sys.time()
+set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV <- caret::train(class~., data=small_train_data, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree<-fit.rpartCV$bestTune$maxdepth
+end_timetree = Sys.time()
+end_timetree - start_timetree
+tunetree
+```
+
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree1 = Sys.time()
+set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV0<- caret::train(class~., data=small_train_data0, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree0<-fit.rpartCV0$bestTune$maxdepth
+end_timetree1 = Sys.time()
+end_timetree1 - start_timetree1
+tunetree0
+```
+
+
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree2 = Sys.time()
+set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV3 <- caret::train(class~., data=small_train_data3, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree3<-fit.rpartCV3$bestTune$maxdepth
+end_timetree2 = Sys.time()
+end_timetree2 - start_timetree2
+tunetree3
+```
+#### **Apply model to the test set**
+#### **Confusion Table**
+
+
+```{r,echo=FALSE, warning = FALSE, results='hide'}
+library(rpart)
+tree <- rpart(class~., data=small_train_data, maxdepth=tunetree)
+fit.rpartCV
+tree
+tree.pred <- predict(fit.rpartCV, newdata=validation_data)
+postResample(tree.pred, validation_data$class)
+caret::confusionMatrix(tree.pred, validation_data$class)
+```
+
+```{r,echo=FALSE, warning = FALSE, results='hide'}
+library(rpart)
+tree0 <- rpart(class~., data=small_train_data0, maxdepth=tunetree0)
+fit.rpartCV0
+tree0
+tree.pred0 <- predict(fit.rpartCV0, newdata=validation_data0)
+postResample(tree.pred0, validation_data0$class)
+caret::confusionMatrix(tree.pred0, validation_data0$class)
+```
+
+
+```{r,echo=FALSE, warning = FALSE, results='hide'}
+library(rpart)
+tree3 <- rpart(class~., data=small_train_data3, maxdepth=tunetree)
+fit.rpartCV3
+tree3
+tree.pred3 <- predict(fit.rpartCV3, newdata=validation_data3)
+postResample(tree.pred3, validation_data3$class)
+caret::confusionMatrix(tree.pred3, validation_data3$class)
+```
+
+Voici notre arbre. On a utilisé la représentation graphique avec la fonction fancyRpartPlot
+
+
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, fig.align = 'center', fig.height = 8, fig.width = 8.5}
+library(rattle)
+library(rpart)
+tree <- rpart(class~., data=small_train_data0, maxdepth=tunetree0)
+fancyRpartPlot(tree0,palettes=c("Blues", "Oranges"),cex=0.7,main="Decision Tree", tweak=1)
+```
+La variable qui influence le plus est **fou_73 et fou_2**
+
+
+
+
+### fac
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree = Sys.time()
+set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV00 <- caret::train(class~., data=small_train_data00, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree00<-fit.rpartCV00$bestTune$maxdepth
+end_timetree = Sys.time()
+end_timetree - start_timetree
+tunetree00
+```
+
+
+```{r,echo=FALSE, warning = FALSE,eval=FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree1 = Sys.time()
+set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV01<- caret::train(class~., data=small_train_data01, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree01<-fit.rpartCV01$bestTune$maxdepth
+end_timetree1 = Sys.time()
+end_timetree1 - start_timetree1
+tunetree01
+```
+
+
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree2 = Sys.time()
+set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV31 <- caret::train(class~., data=small_train_data31, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree31<-fit.rpartCV31$bestTune$maxdepth
+end_timetree2 = Sys.time()
+end_timetree2 - start_timetree2
+tunetree31
+```
+
+#### **Apply model to the test set**
+#### **Confusion Table**
+
+```{r,echo=FALSE, warning = FALSE, results='hide'}
+library(rpart)
+tree00 <- rpart(class~., data=small_train_data00, maxdepth=tunetree00)
+fit.rpartCV00
+tree00
+tree.pred00 <- predict(fit.rpartCV00, newdata=validation_data00)
+postResample(tree.pred00, validation_data00$class)
+caret::confusionMatrix(tree.pred00, validation_data00$class)
+```
+
+```{r,echo=FALSE, warning = FALSE,eval=FALSE, results='hide'}
+library(rpart)
+tree01 <- rpart(class~., data=small_train_data01, maxdepth=tunetree01)
+fit.rpartCV01
+tree0
+tree.pred01<- predict(fit.rpartCV0, newdata=validation_data01)
+postResample(tree.pred01, validation_data01$class)
+caret::confusionMatrix(tree.pred01, validation_data01$class)
+```
+
+
+```{r,echo=FALSE, warning = FALSE, results='hide'}
+library(rpart)
+tree31 <- rpart(class~., data=small_train_data31, maxdepth=tunetree31)
+fit.rpartCV31
+tree31
+tree.pred31 <- predict(fit.rpartCV31, newdata=validation_data31)
+postResample(tree.pred31, validation_data31$class)
+caret::confusionMatrix(tree.pred3, validation_data31$class)
+```
+
+
+
+
+Voici notre arbre. On a utilisé la représentation graphique avec la fonction fancyRpartPlot
+
+
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, fig.align = 'center', fig.height = 8, fig.width = 8.5}
+library(rattle)
+library(rpart)
+tree <- rpart(class~., data=small_train_data0, maxdepth=tunetree00)
+fancyRpartPlot(tree00,palettes=c("Blues", "Oranges"),cex=0.7,main="Decision Tree", tweak=1)
+```
+La variable qui influence le plus est **fou_73 et fou_2**
+
+
+
+Nous avons une faible taux d'erreur de validation et elle est équivalant à l'erreur d'apprentissage. 
+
+Le kappa est faible donc accord faible sur la prédiction par rapport à une prédiction au hasard.
+
+
+
+
+
+
+### 6.3 Random Forest  
+
+Nous allons utiliser random Forest qui utilise le bagging et donc prend en compte la majorité des variables. 
+
+
+Random Forest
+
+  method = 'rf'
+
+Type: Classification, Regression
+
+Tuning parameters:
+
+    - mtry (#Randomly Selected Predictors)
+
+Required packages: randomForest
+
+A model-specific variable importance metric is available
+
+
+### fou
+#### **Fine-Tuning Hyperparameters avec Cross Validation et Grid Search**
+
+Nous utilisons le paramètre number=2. 
+
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random <- caret::train(class~., data=small_train_data, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid, 
+                trControl=control)
+
+
+end_timerf = Sys.time()
+end_timerf - start_timerf
+rf_random
+```
+
+
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf3 = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random3 <- caret::train(class~., data=small_train_data3, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid, 
+                trControl=control)
+
+
+end_timerf3 = Sys.time()
+end_timerf3 - start_timerf3
+rf_random3
+```
+
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf0 = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random0 <- caret::train(class~., data=small_train_data0, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid, 
+                trControl=control)
+end_timerf0 = Sys.time()
+end_timerf0 - start_timerf0
+rf_random0
+```
+
+#### **Apply model to the test set**
+#### **Confusion Table**
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+
+rf.pred0 <- predict(rf_random0, newdata=validation_data0)
+
+caret::confusionMatrix(rf.pred0, validation_data0$class)
+postResample(rf.pred0, validation_data0$class)
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 6.5, fig.width = 5.5}
+plot(varImp(rf_random0))
+```
+
+Voici le resultat de l'apprentissage :
+Nous avons une plus grande erreur d'apprentissage sur ce modèle par rapport aux premiers.
+
+Nous avons une bonne accuracy pour la prédiction mais le temps d'excution est long.
+
+### fac
+#### **Fine-Tuning Hyperparameters avec Cross Validation et Grid Search**
+
+Nous utilisons le paramètre number=2. 
+
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid00 <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random00 <- caret::train(class~., data=small_train_data00, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid00, 
+                trControl=control)
+
+
+end_timerf = Sys.time()
+end_timerf - start_timerf
+rf_random00
+```
+
+
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf3 = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid31 <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random31 <- caret::train(class~., data=small_train_data31, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid31, 
+                trControl=control)
+
+
+end_timerf3 = Sys.time()
+end_timerf3 - start_timerf3
+rf_random31
+```
+
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf0 = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid01 <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random01 <- caret::train(class~., data=small_train_data01, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid01, 
+                trControl=control)
+end_timerf0 = Sys.time()
+end_timerf0 - start_timerf0
+rf_random01
+```
+
+#### **Apply model to the test set**
+#### **Confusion Table**
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+
+rf.pred01 <- predict(rf_random01, newdata=validation_data01)
+
+caret::confusionMatrix(rf.pred01, validation_data01$class)
+postResample(rf.pred01, validation_data01$class)
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 6.5, fig.width = 5.5}
+plot(varImp(rf_random01))
+```
+
+Voici le resultat de l'apprentissage :
+Nous avons une plus grande erreur d'apprentissage sur ce modèle par rapport aux premiers.
+
+Nous avons une bonne accuracy pour la prédiction mais le temps d'excution est long.
+
+
+
+
+
+### 6.4 Neural Networks
+
+Les réseaux neuronaux sont l'un des modèles d'apprentissage machine les plus fascinants car leur structure est inspirée par le cerveau.
+
+Neural Network
+
+  method = 'nnet'
+
+Type: Classification, Regression
+
+Tuning parameters:
+
+   - size (#Hidden Units)
+   
+   - decay (Weight Decay)
+
+Required packages: nnet
+
+A model-specific variable importance metric is available.
+
+
+### fou
+#### **Fine-Tuning recherche des Hyperparameters avec Cross validation et grid search**
+
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 2, search = "grid")
+
+my.grid <- expand.grid(size = c(6,8,12), decay = c(0.5,0.8,1,2,3))
+
+model.nn <- caret::train(class~.,
+                  data = small_train_data,
+                  method = "nnet",tuneGrid = my.grid,trControl = ctrl)
+
+end_timenet = Sys.time()
+end_timenet - start_timenet
+```
+
+
+
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet3 = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 2, search = "grid")
+
+my.grid2 <- expand.grid(size = c(6,8,12,14), decay = c(0.2,0.5,0.8,1))
+
+model.nn3 <- caret::train(class~.,
+                  data = small_train_data3,
+                  method = "nnet",tuneGrid = my.grid2,trControl = ctrl)
+
+end_timenet3 = Sys.time()
+end_timenet3 - start_timenet3
+
+model.nn3
+predictions3 <- predict(model.nn3, validation_data3,type = 'raw')
+postResample(predictions3, validation_data3$class)
+caret::confusionMatrix(predictions3, validation_data3$class)
+
+
+```
+
+
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet3 = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 2, search = "grid")
+
+my.grid2 <- expand.grid(size = c(6,8,12,14), decay = c(0.2,0.5,0.8,1))
+
+model.nn0 <- caret::train(class~.,
+                  data = small_train_data0,
+                  method = "nnet",tuneGrid = my.grid2,trControl = ctrl)
+
+end_timenet3 = Sys.time()
+end_timenet3 - start_timenet3
+
+model.nn0
+predictions0 <- predict(model.nn0, validation_data0,type = 'raw')
+postResample(predictions0, validation_data0$class)
+caret::confusionMatrix(predictions0, validation_data0$class)
+
+
+```
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 4.5}
+plot(model.nn0)
+```
+
+
+
+Le graphe **plotnet** du réseau de neurones:
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 8, fig.width = 10}
+library(NeuralNetTools)
+plotnet(model.nn0,x_names = NULL, y_names = "class",pad_x = 0.8,pad_y = 1, alpha = 0.6,)
+```
+
+
+#### **Apply the tree to test set**
+#### **Confusion Table**
+
+
+Voici le resultat de la validation:
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+predictions3 <- predict(model.nn3, validation_data3,type = 'raw')
+postResample(predictions3, validation_data3$class)
+caret::confusionMatrix(predictions3, validation_data3$class)
+
+```
+
+
+```{r, eval=FALSE,echo=FALSE,results='hide', warning = FALSE, cache=TRUE}
+varImp(model.nn3)
+```
+
+Nous avons une faible erreur de validation et elle est équivalant à l'erreur d'apprentissage. 
+
+Le kappa est modéré avec un accord modéré de prédiction.
+
+
+### fac
+#### **Fine-Tuning recherche des Hyperparameters avec Cross validation et grid search**
+
+```{r,echo=FALSE,eval=FALSE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 2, search = "grid")
+
+my.grid <- expand.grid(size = c(6,8,12), decay = c(0.5,0.8,1,2,3))
+
+model.nn00<- caret::train(class~.,
+                  data = small_train_data00,
+                  method = "nnet",tuneGrid = my.grid,trControl = ctrl)
+
+end_timenet = Sys.time()
+end_timenet - start_timenet
+```
+
+
+
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet3 = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 2, search = "grid")
+
+my.grid2 <- expand.grid(size = c(6,8,12,14), decay = c(0.2,0.5,0.8,1))
+
+model.nn31 <- caret::train(class~.,
+                  data = small_train_data31,
+                  method = "nnet",tuneGrid = my.grid2,trControl = ctrl)
+
+end_timenet3 = Sys.time()
+end_timenet3 - start_timenet3
+
+model.nn31
+predictions31 <- predict(model.nn31, validation_data31,type = 'raw')
+postResample(predictions31, validation_data31$class)
+caret::confusionMatrix(predictions31, validation_data31$class)
+
+
+```
+
+
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet3 = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 2, search = "grid")
+
+my.grid2 <- expand.grid(size = c(6,8,12,14), decay = c(0.2,0.5,0.8,1))
+
+model.nn01 <- caret::train(class~.,
+                  data = small_train_data01,
+                  method = "nnet",tuneGrid = my.grid2,trControl = ctrl)
+
+end_timenet3 = Sys.time()
+end_timenet3 - start_timenet3
+
+model.nn01
+```
+
+#### **Apply the tree to test set**
+#### **Confusion Table**
+
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+predictions01 <- predict(model.nn01, validation_data01,type = 'raw')
+postResample(predictions01, validation_data01$class)
+caret::confusionMatrix(predictions01, validation_data01$class)
+
+
+```
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 4.5}
+plot(model.nn01)
+```
+
+
+
+Le graphe **plotnet** du réseau de neurones:
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 8, fig.width = 10}
+library(NeuralNetTools)
+plotnet(model.nn01,x_names = NULL, y_names = "class",pad_x = 0.8,pad_y = 1, alpha = 0.6,)
+```
+
+
+
+Nous avons une faible erreur de validation et elle est équivalant à l'erreur d'apprentissage. 
+
+Le kappa est modéré avec un accord modéré de prédiction.
+
+Nous avons une très bonne accuracy pour la prédiction mais le temps d'excution est très long.
+
+
+### 6.5 K Plus proche voisins KNN
+
+
+Le k Nearest Neighbors (KNN) est un algorithme qui peut servir autant pour la classification que la régression. L'algorithme Le plus proches voisins consiste à choisir les k données les plus proches du point étudié afin d’en prédire sa valeur.
+
+k-Nearest Neighbors
+
+  method = 'knn'
+
+Type: Classification, Regression
+
+Tuning parameters:
+
+    - k (#Neighbors)
+
+Nous utilisons le paramètre number=10 et pas de répétitions car le temps d'execution est trop long. 
+
+### fou
+#### **Fine-Tuning recherche des Hyperparameters avec Cross-Validation et Grid search**
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn <- caret::train(class~ ., data = small_train_data, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn = Sys.time()
+end_timeknn - start_timeknn
+model_knn
+
+
+predict_knn <- predict(model_knn, validation_data, type='raw')
+
+postResample(predict_knn, validation_data$class)
+caret::confusionMatrix(predict_knn, validation_data$class)
+plot(model_knn)
+```
+```{r, eval=TRUE,echo=FALSE,results='hide', warning = FALSE, cache=TRUE}
+varImp(model_knn)
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 6.5, fig.width = 5.5}
+plot(varImp(model_knn))
+```
+
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn3 = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn3 <- caret::train(class~ ., data = small_train_data3, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn3 = Sys.time()
+end_timeknn3 - start_timeknn3
+model_knn3
+
+
+predict_knn3 <- predict(model_knn3, validation_data3, type='raw')
+
+postResample(predict_knn3, validation_data3$class)
+caret::confusionMatrix(predict_knn3, validation_data3$class)
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn3 = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn0 <- caret::train(class~ ., data = small_train_data0, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn3 = Sys.time()
+end_timeknn3 - start_timeknn3
+
+
+model_knn0
+```
+#### **Apply the tree to test set**
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+predict_knn0 <- predict(model_knn0, validation_data0, type='raw')
+
+postResample(predict_knn0, validation_data0$class)
+caret::confusionMatrix(predict_knn0, validation_data0$class)
+```
+
+
+Nous avons une faible erreur d'apprentissage. Le kappa est élevé avec un accord élevé de prédiction
+
+Voici les paramètres choisis :
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 5.5}
+plot(varImp(model_knn0))
+```
+
+
+Nous avons trouver une stratégie pour avoir une valeur optimale pour le paramètre k. Le niveau de prediction est bon avec un temps d'exécution correcte.
+
+
+### fac
+#### **Fine-Tuning recherche des Hyperparameters avec Cross-Validation et Grid search**
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn00 <- caret::train(class~ ., data = small_train_data00, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn = Sys.time()
+end_timeknn - start_timeknn
+model_knn00
+
+
+
+```
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 6.5, fig.width = 5.5}
+plot(varImp(model_knn00))
+```
+
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn3 = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn31 <- caret::train(class~ ., data = small_train_data31, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn3 = Sys.time()
+end_timeknn3 - start_timeknn3
+model_knn31
+
+
+
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn3 = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn01 <- caret::train(class~ ., data = small_train_data01, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn3 = Sys.time()
+end_timeknn3 - start_timeknn3
+
+
+model_knn01
+```
+#### **Apply the tree to test set**
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+
+predict_knn00 <- predict(model_knn00, validation_data00, type='raw')
+
+postResample(predict_knn00, validation_data00$class)
+caret::confusionMatrix(predict_knn00, validation_data00$class)
+plot(model_knn)
+
+
+```
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+
+predict_knn31 <- predict(model_knn31, validation_data31, type='raw')
+
+postResample(predict_knn31, validation_data31$class)
+caret::confusionMatrix(predict_knn31, validation_data31$class)
+
+
+
+```
+
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+predict_knn01 <- predict(model_knn01, validation_data01, type='raw')
+
+postResample(predict_knn01, validation_data01$class)
+caret::confusionMatrix(predict_knn01, validation_data01$class)
+```
+
+
+Nous avons une faible erreur d'apprentissage. Le kappa est élevé avec un accord élevé de prédiction
+
+Voici les paramètres choisis :
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 5.5}
+plot(varImp(model_knn00))
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+plot(varImp(model_knn31))
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 5.5}
+plot(varImp(model_knn01))
+```
+
+
+
+
+
