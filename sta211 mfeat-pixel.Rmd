@@ -1,0 +1,778 @@
+---
+title: "Projet The multi-feature digit dataset Pixel "
+subtitle: "STA211 - 2019/2020"
+author: 'L.RANT '
+date: "`r format(Sys.time(),'%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: lumen
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# 1 Introduction
+
+
+Ce jeu de données est constitué de caractéristiques de chiffres manuscrits (`0'--`9') extrait d'une collection de cartes d'utilité publique néerlandaises. Les modèles ont été numérisés en  images binaire. Ces chiffres sont représentés par les six des ensembles de fonctionnalités suivantes : 
+
+1. mfeat-fou: 76 Fourier coefficients of the character shapes; 
+2. mfeat-fac: 216 profile correlations; 
+3. mfeat-kar: 64 Karhunen-Love coefficients; 
+4. mfeat-pix: 240 pixel averages in 2 x 3 windows; 
+5. mfeat-zer: 47 Zernike moments; 
+6. mfeat-mor: 6 morphological features. 
+
+Nous n'avons pas de valeurs manquantes.
+La problématique: en analysant les 6 groupes séparement on gardera dans chaque groupe les variables qui influence le plus le choix des classes et cherchera le meilleur algorithme qui peut predire les classes.
+
+# 2 Importation des données
+
+
+```{r , echo=FALSE}
+#setwd("/Users/romain/projects/STA211");
+load("data_train.rda");
+setwd("C:/Users/lnzb7292/Downloads/STA211/projet s2 2019/"); #Lova
+#setwd()  #Dimitri
+#setwd()  #Romain
+library("factoextra")
+library(data.table)
+data_pix = data_train[, c(363: 602,650)]
+columnNumber <- which(colnames(data_pix)=="class")
+data_pix <- data_pix[,c(columnNumber,1:ncol(data_pix)-1)]# put this class to column 1
+head(data_pix, n = 10L)
+
+#data_pix_shuffle <- data_pix[sample(nrow(data_pix)),]#random
+#columnNumber <- which(colnames(data_pix_shuffle)=="class")#get class column number
+#data_pix_shuffle <- data_pix_shuffle[,c(columnNumber,1:ncol(data_pix_shuffle)-1)]# put this class to column 1
+#head(data_pix_shuffle)
+#data_pix_shuffle_with_factor_first_column <- df <- df[,c(your_column_number_here,1:ncol(df)-1)]
+
+## 75% of the sample size
+smp_size.pix <- floor(0.75 * nrow(data_pix))
+set.seed(123)
+train_ind.pix <- sample(seq_len(nrow(data_pix)), size = smp_size.pix)
+data_pix.train <- data_pix[train_ind.pix, ]
+data_pix.test <- data_pix[-train_ind.pix, ]
+
+```
+# 3 Aperçu général
+```{r directoy, echo=FALSE}
+table(sapply(data_pix,class))
+nrow(data_pix)
+ncol(data_pix)
+nrow(data_pix$class)
+sum(data_pix$class == "0")
+sum(data_pix$class == "1")
+```
+REPRESENTATION GRAPHIQUE DES GROUPES DE PIXELS
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+## plot the  9 first figures
+require(data.table)
+#put class at the 
+#data_pix <- df <- df[,c(241,1:ncol(df)-1)]
+
+##Building a 3*3 grid
+par(mfrow=c(6,6),mar=c(0.1,0.1,0.1,0.1))
+for (i in 1:36)
+{
+##Changing i-th row to matrix
+ mat=matrix(as.numeric(data_pix.train[i,2:240]),nrow = 15,ncol=16,byrow =F)
+ 
+##Inverting row order
+mat=mat[,nrow(mat):1]
+##plot
+# image(mat,main=paste0('This is a ',data_pix[i,1]))
+ image(mat,main=paste0('number'))
+}
+```
+# 4 Exploration
+
+## 4.1 Analyse univariée
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+library(stargazer)
+stargazer(data_pix,summary.stat=c("n","min","p25","median","mean","p75","max","sd"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+
+
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+## split dataset into 10, one for each class
+X <- split(data_pix, data_pix$class)
+str(X)
+
+ZERO <- X[[1]]
+UN <- X[[2]]
+DEUX<- X[[3]]
+TROIS <- X[[4]]
+QUATRE <- X[[5]]
+CINQ <- X[[6]]
+SIX <- X[[7]]
+SEPT <- X[[8]]
+HUIT <- X[[9]]
+NEUF <- X[[10]]
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(ZERO,summary.stat=c("n","min","p25","median","mean","p75","max","sd"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(UN,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(DEUX,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(TROIS,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(QUATRE,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(CINQ,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(SIX,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(SEPT,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(HUIT,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r, echo = FALSE, eval=FALSE,warning=FALSE}
+stargazer(NEUF,summary.stat=c("mean"),type = "text")
+## moyenne a 1 peut etre supprimé: cela signifie que le groupe de pixel n'est quasiment jamais activé, et donc ne sera pas utile
+```
+```{r,echo=FALSE, message=FALSE,eval=FALSE, fig.align='center', fig.height=5, fig.width=5, warning=TRUE}
+
+SEPARATION PAR GROUPE ET HISTOGRAMMES
+#histogrammes exemple sur zero
+var.numeric<-which(sapply(ZERO,class)=="numeric"|sapply(ZERO,class)=="Factor")
+names(var.numeric)
+var.factor<-which(sapply(ZERO,class)=="factor")
+names(var.factor)
+mapply(ZERO[,var.numeric],
+       FUN=function(xx,name){hist(xx,main=name)},
+       name=var.numeric)
+```
+Representation des 240 groupes de pixels:
+sur chaque groupe, supprimer ce qui ne servent à rien.on supprime les colonnes selon le résultat du fichier excel
+ sélection de variables 
+```{r,echo=FALSE, message=FALSE,eval=TRUE, fig.align='center', fig.height=5, fig.width=5, warning=TRUE}
+
+cols.dont.want <- c("pix_1","pix_15","pix_31","pix_45","pix_46","pix_60","pix_61","pix_75","pix_76","pix_90","pix_91","pix_105","pix_106","pix_120","pix_121","pix_135","pix_136","pix_150","pix_151","pix_165","pix_166","pix_180","pix_181","pix_195","pix_196","pix_210","pix_211","pix_212","pix_225","pix_226","pix_227","pix_228","pix_229","pix_230","pix_231","pix_232","pix_233","pix_234","pix_235","pix_236","pix_237","pix_238","pix_239","pix_240")
+#cols.dont.want <- c("genome", "region") # if you want to remove multiple columns
+
+data_pix_removeunivar <- data_pix[, ! names(data_pix) %in% cols.dont.want, drop = F]
+
+```
+
+
+
+
+
+## 4.2 Analyse bivariée
+```{r,echo=FALSE, warning = FALSE, eval=TRUE, fig.align='center', fig.height=6, fig.width=8}
+#Chargement du package BioStatR
+library(BioStatR)
+```
+
+1. pix
+```{r,echo=FALSE, warning = FALSE, eval=TRUE, fig.align='center', fig.height=6, fig.width=8, warning=TRUE}
+#calcul des rapport de corrélation
+var1.numeric<-which(sapply(data_pix_removeunivar,class)=="numeric"|sapply(data_pix_removeunivar,class)=="Factor")
+
+res.eta2<-sapply(data_pix_removeunivar[,var1.numeric],eta2,y=data_pix_removeunivar$class)
+
+#tri par valeurs décroissantes
+res.eta2<-sort(res.eta2)
+
+#représentation
+par(mar=c(5, 15, 4, 2) + 0.1)#pour gérer les marges du graphique
+barplot1<-barplot(res.eta2,horiz = TRUE,las=2,xlab=expression(eta^2))
+```
+```{r,echo = FALSE}
+head(sort(res.eta2,decreasing = TRUE),10)
+```
+```{r,echo = FALSE}
+head(sort(res.eta2,decreasing = FALSE),10)
+```
+
+Voici la **matrice des corrélations** :
+```{r, echo = FALSE,eval=FALSE,warning=FALSE, fig.align = 'center', fig.height = 8, fig.width = 8}
+library(DescTools)
+matcram<-cor(data_pix_removeunivar[,var1.numeric])
+
+PlotCorr(matcram,
+         
+         breaks=seq(0, 1, length=21),cex.axis = 0.7, 
+         args.colorlegend = list(labels=sprintf("%.1f", seq(0, 1, length = 15)), frame=TRUE))
+text(x=rep(1:ncol(matcram),ncol(matcram)), y=rep(1:ncol(matcram),each=ncol(matcram)),
+     label=sprintf("%0.2f", matcram[,ncol(matcram):1]), cex=0.2, xpd=TRUE)
+```
+Nous observons de tres fortes corrélations
+
+Voici la matrice des **corrélations avec coefficient de spearman** par rang :
+```{r, echo = FALSE,eval=FALSE,warning=FALSE, fig.align = 'center', fig.height = 8, fig.width = 8}
+matcor<-cor(data_pix_removeunivar[,var1.numeric],method = "spearman")
+PlotCorr(matcram,
+        
+         breaks=seq(0, 1, length=21),cex.axis = 0.7, 
+         args.colorlegend = list(labels=sprintf("%.1f", seq(0, 1, length = 15)), frame=TRUE))
+text(x=rep(1:ncol(matcor),ncol(matcor)), y=rep(1:ncol(matcor),each=ncol(matcor)),
+     label=sprintf("%0.2f", matcor[,ncol(matcor):1]), cex=0.3, xpd=TRUE)
+```
+
+## 4.3 Analyse multivariée
+
+### 4.3.1 Analyse factorielle
+
+
+### 4.3.2 ACP sur les données quantitatives
+
+Transformation de variables
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 4, fig.width = 5.5}
+library('FactoMineR')
+library('factoextra')
+data_acp<-data_pix.train
+#data_acp$outcome<-as.integer(data_acp$outcome)
+res.pca<-PCA(data_acp,quali.sup=1,graph = FALSE)
+options(max.print = 1500)
+
+par(mar = c(2.6, 4.1, 1.1, 2.1))
+fviz_eig(res.pca, addlabels = TRUE,ncp = 20, ylim = c(0, 50))
+```
+
+
+
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+summary(res.pca)
+```
+```{r, echo = FALSE, fig.align = 'center', fig.height = 2, fig.width = 5.5}
+drawn <-
+integer(0)
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+#plot.PCA(res.pca, select = drawn, axes = 1:2, choix = 'ind', invisible = 'quali', title = '', cex = cex)
+fviz_contrib(res.pca, choice = "ind", axes = 1:2, top = 7)+
+  theme(axis.text = element_text(size = 7.5))
+```
+```{r,echo=FALSE,eval=FALSE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 5.5, fig.width = 5.5}
+library("factoextra")
+eig.val <- get_eigenvalue(res.pca)
+eig.val
+```
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE}
+#par(mfrow=c(6,6),mar=c(0.1,0.1,0.1,0.1))
+par(mfrow=c(1,1),mar=c(10,10,10,10))
+for (i in 651:651)
+{
+##Changing i-th row to matrix
+ mat=matrix(as.numeric(data_pix.train[i,2:240]),nrow = 15,ncol=16,byrow =F)
+ 
+##Inverting row order
+mat=mat[,nrow(mat):1]
+##plot
+# image(mat,main=paste0('This is a ',data_pix[i,1]))
+ image(mat,main=paste0('number'))
+}
+```
+
+
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 3, fig.width = 5.5}
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+
+fviz_pca_ind(res.pca, label="none", habillage=1, axes = 1:2,addEllipses=TRUE, ellipse.level=0.95)
+
+```
+Exploitation de l'acp garder les 50 premieres composante principales
+```{r, echo = FALSE, eval=TRUE,warning=FALSE}
+PCA1=prcomp(data_pix.train[,(2:ncol(data_pix.train))],center = T,scale. = F)
+
+```
+
+```{r,echo=FALSE,eval=TRUE, warning = FALSE, cache=TRUE,fig.align = 'center', fig.height = 3, fig.width = 5.5}
+summary(PCA1)
+```
+```{r, echo = FALSE, eval=TRUE,warning=FALSE}
+library(knitr)
+projected=scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+###Keeping only the three main dimensions
+n_dim=50
+##Projecting the data back using only the 3 principal components
+coord_x=data.table(data_pix.train$class,projected[,1:n_dim]%*%t(PCA1$rotation)[1:n_dim,])
+par(mfrow=c(6,6),mar=c(0.1,0.1,0.1,0.1))
+##Plotting 36 observations
+for (i in 1:36)
+{
+  mat=matrix(as.numeric(coord_x[i,2:240]),nrow = 15,ncol=16,byrow = F)
+#mat=mat[nrow(mat):1,]
+  mat=mat[,nrow(mat):1]
+image(mat,main=paste0('This is a ',coord_x[i,1]))
+}
+```
+Exploitation de l'acp garder les 10 premieres composante principales. Pertes d'information mais gain de temps. Sur des gros datasets?
+```{r, echo = FALSE, eval=TRUE,warning=FALSE}
+PCA1=prcomp(data_pix.train[,(2:ncol(data_pix.train))],center = T,scale. = F)
+projected=scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+###Keeping only the three main dimensions
+n_dim=10
+##Projecting the data back using only the 3 principal components
+coord_x=data.table(data_pix.train$class,projected[,1:n_dim]%*%t(PCA1$rotation)[1:n_dim,])
+par(mfrow=c(6,6),mar=c(0.1,0.1,0.1,0.1))
+##Plotting 36 observations
+for (i in 1:36)
+{
+  mat=matrix(as.numeric(coord_x[i,2:240]),nrow = 15,ncol=16,byrow = F)
+#mat=mat[nrow(mat):1,]
+    mat=mat[,nrow(mat):1]
+image(mat,main=paste0('This is a ',coord_x[i,1]))
+}
+```
+Exploitation de l'acp garder les 40 premieres composante principales. Pertes d'information mais gain de temps.  Sur des gros datasets? test a 30 non concluant.
+```{r, echo = FALSE, eval=TRUE,warning=FALSE}
+PCA1=prcomp(data_pix.train[,(2:ncol(data_pix.train))],center = T,scale. = F)
+projected=scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+###Keeping only the three main dimensions
+n_dim=40
+##Projecting the data back using only the 3 principal components
+coord_x=data.table(data_pix.train$class,projected[,1:n_dim]%*%t(PCA1$rotation)[1:n_dim,])
+par(mfrow=c(6,6),mar=c(0.1,0.1,0.1,0.1))
+##Plotting 36 observations
+for (i in 1:36)
+{
+  mat=matrix(as.numeric(coord_x[i,2:240]),nrow = 15,ncol=16,byrow = F)
+#mat=mat[nrow(mat):1,]
+    mat=mat[,nrow(mat):1]
+image(mat,main=paste0('This is a ',coord_x[i,1]))
+}
+```
+ 
+# 5 Pré-traitement
+ 
+La récupération dataSET basé sur l'acp a 40 dimensions. Cela permet une reduction du nombre de variable, passant de 240 à 40 avec une perte d'information acceptable:87,6% de l'information est résumée
+```{r, echo = FALSE, eval=TRUE,warning=FALSE}
+acp_train  <- NULL
+n_dim=40
+
+acp_train <-scale(data_pix.train[,(2:ncol(data_pix.train))], PCA1$center, PCA1$scale) %*% PCA1$rotation
+acp_train <-acp_train[,1:n_dim]
+acp_train = cbind(acp_train, replicate(1,data_pix.train$class))
+
+colnames(acp_train)[ncol(acp_train)] <- "class"
+acp_train_dt <- as.data.frame(acp_train)
+
+acp_train_dt <- acp_train_dt[,c(n_dim+1,1:ncol(acp_train_dt)-1)]## class to first colummn
+
+acp_train_dt[] <- lapply(acp_train_dt, function(x) as.numeric(as.character(x)))##convert to numeric all the fields
+acp_train_dt$class <- as.factor(acp_train_dt$class)## convert to factor class
+```
+
+On transforme notre dataset Test grace aux 40 composantes principales
+on passe de 375*241 à 40*241
+```{r, echo = FALSE, eval=TRUE,warning=FALSE}
+acp_test <- NULL
+acp_test <- predict(PCA1, newdata=data_pix.test[,(2:ncol(data_pix.test))])
+acp_test <-acp_test[,1:n_dim]
+acp_test = cbind(acp_test, replicate(1,data_pix.test$class))
+colnames(acp_test)[ncol(acp_test)] <- "class"
+library(reshape)
+#acp_test_dt =melt(acp_test)
+#acp_test_dt2 <- data.frame(row=c(row(acp_test)), col=c(col(acp_test)), value=c(acp_test))
+acp_test_dt <- as.data.frame(acp_test)
+acp_test_dt <- acp_test_dt[,c(n_dim+1,1:ncol(acp_test_dt)-1)]## class to first colummn
+
+acp_test_dt[] <- lapply(acp_test_dt, function(x) as.numeric(as.character(x)))##convert to numeric all the fields
+acp_test_dt$class <- as.factor(acp_test_dt$class)## convert to factor class
+```
+
+on tente la préduction avec les fameuses méthodes :
+
+# 6 prédiction
+
+
+### Arbre de décision /Tree CART
+
+utilisation de la librairie CARET
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+#model2a: CART using rpart with CV
+library(caret)
+start_timetree = Sys.time()
+##set.seed(123)
+fitControl <- trainControl(method = 'repeatedcv', number=10, repeats=5, search = "grid")
+
+Grid1<-expand.grid(maxdepth=c(1:30))
+fit.rpartCV <- caret::train(class~., data=acp_train_dt, method = 'rpart2' ,tuneGrid = Grid1)
+
+tunetree<-fit.rpartCV$bestTune$maxdepth
+end_timetree = Sys.time()
+end_timetree - start_timetree
+
+```
+exploitataion des Résultats du CART
+```{r,echo=FALSE, warning = FALSE, results='hide'}
+library(rpart)
+tree1 <- rpart(class~., data=acp_train_dt, maxdepth=tunetree)
+
+tree1
+```
+
+Voici le resultat de l'apprentissage :
+```{r,echo=FALSE, warning = FALSE}
+fit.rpartCV
+```
+Nous avons une faible erreur d'apprentissage.
+
+
+Voici les paramètres choisis :
+```{r,echo=FALSE, warning = FALSE}
+cat("Best parameter pour maxdepth est :" , tunetree)
+```
+
+
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, fig.align = 'center', fig.height = 3, fig.width = 4.5}
+plot(fit.rpartCV)
+
+
+```
+
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, fig.align = 'center', fig.height = 5, fig.width = 8.5}
+library(rattle)
+fancyRpartPlot(tree1,palettes=c("Blues", "Oranges"),cex=0.7,main="Decision Tree", tweak=1)
+```
+```{r, echo=FALSE, warning = FALSE,cache = TRUE}
+tree.pred <- predict(fit.rpartCV, newdata=acp_test_dt)
+```
+
+
+Voici le resultat de la validation:
+```{r, echo=FALSE, warning = FALSE,cache = TRUE}
+postResample(tree.pred, acp_test_dt$class)
+caret::confusionMatrix(tree.pred, acp_test_dt$class)
+
+```
+#### **Confusion Table**
+```{r, echo=FALSE, eval=TRUE,warning = FALSE,cache = TRUE}
+confusiontree <- table(tree.pred, acp_test_dt$class)
+tree.acc<-diag(confusiontree)/sum(confusiontree)
+
+
+n = sum(confusiontree) # number of instances
+ nc = nrow(confusiontree) # number of classes
+ diag = diag(confusiontree) # number of correctly classified instances per class 
+ rowsums = apply(confusiontree, 1, sum) # number of instances per class
+ colsums = apply(confusiontree, 2, sum) # number of predictions per class
+ p = rowsums / n # distribution of instances over the actual classes
+ q = colsums / n # distribution of instances over the predicted classes
+tree.acc = sum(diag) / n
+ tree.precision = diag / colsums 
+ tree.recall = diag / rowsums 
+
+
+
+resultats.tree <- data.frame( 'Durée'=c(end_timetree - start_timetree),Accuracy=c(tree.acc),'Taux Erreur' = c(1-tree.acc), row.names=c("CART"))
+
+
+
+
+```
+```{r,echo=FALSE,eval=TRUE,warning = FALSE,cache = TRUE,results='hide'}
+confusiontree <- table(tree.pred, data_pix.test$class)
+res=0
+for (i in 1:ncol(confusiontree)){
+ 
+  res<-confusiontree[i,1]+res
+  
+}
+res
+sum((confusiontree[,1]))
+
+```
+```{r, echo=FALSE, eval=TRUE,warning = FALSE, cache=TRUE}
+#resultats.tree
+library(knitr)
+kable(resultats.tree,booktabs= T,caption = "Resultats Classification Tree CART")  
+```
+### Random Forest
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+start_timerf = Sys.time()
+control <- trainControl(method="cv", 
+                        number=2, 
+                        allowParallel = TRUE,search = "grid")
+metric <- "Accuracy"
+tunegrid <- data.frame(mtry = seq(8,20,4))
+
+set.seed(123)
+
+rf_random <- caret::train(class~., data=acp_train_dt, 
+                method="rf", 
+                metric=metric, 
+                tuneGrid=tunegrid, 
+                trControl=control)
+
+
+end_timerf = Sys.time()
+end_timerf - start_timerf
+
+```
+Voici le resultat de l'apprentissage :
+```{r, echo=FALSE, warning = FALSE, cache=TRUE}
+rf_random
+```
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, cache=TRUE}
+cat("Best parameter pour mtry est :" , rf_random$bestTune$mtry,"\n")
+
+```
+
+
+
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, ,fig.align = 'center', fig.height = 2.5, fig.width = 4}
+plot(rf_random)
+```
+
+
+
+
+
+#### **Apply model to the test set**
+
+```{r, echo=FALSE, warning = FALSE,cache = TRUE}
+rf.pred1 <- predict(rf_random, newdata=acp_test_dt)
+postResample(rf.pred1, acp_test_dt$class)
+
+#caret::confusionMatrix(rf.pred1, data_pix.test$class)
+
+```
+
+Nous avons une faible taux d'erreur de validation et elle est équivalant à l'erreur d'apprentissage. 
+
+Le kappa est faible donc accord faible sur la prédiction par rapport à une prédiction au hasard.
+
+
+
+#### **Confusion Table**
+```{r,echo=FALSE,  eval=TRUE,warning = FALSE, cache=TRUE}
+confusionrf <- table(rf.pred1, acp_test_dt$class)
+rf.acc<-diag(confusionrf)/sum(confusionrf)
+
+
+n = sum(confusionrf) # number of instances
+ nc = nrow(confusionrf) # number of classes
+ diag = diag(confusionrf) # number of correctly classified instances per class 
+ rowsums = apply(confusionrf, 1, sum) # number of instances per class
+ colsums = apply(confusionrf, 2, sum) # number of predictions per class
+ p = rowsums / n # distribution of instances over the actual classes
+ q = colsums / n # distribution of instances over the predicted classes
+rf.acc = sum(diag) / n
+ rf.precision = diag / colsums 
+ rf.recall = diag / rowsums 
+
+
+
+
+
+
+
+resultats.rf <- data.frame( 'Durée'=c(end_timerf - start_timerf),Accuracy=c(rf.acc),'Taux Erreur' = c(1-rf.acc), row.names=c("Random Forest  "))
+
+
+
+```
+
+
+La matrice de confusion suivante se lit alors comme suit :
+
+
+
+#### **Resultat de la prédiction**
+```{r, echo=FALSE, eval=TRUE,warning = FALSE, cache=TRUE}
+
+resultats.rf
+
+#resultats.rf
+kable(resultats.rf,booktabs= T,caption = "Resultats Random Forest  ") ## %>%
+ ## kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+Nous avons une bonne accuracy pour la prédiction mais le temps d'excution est long.
+
+### Neural Networks/reseau de neurones
+
+ - size (#Hidden Units)
+   
+   - decay (Weight Decay)
+   
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 5, search = "grid")
+
+my.grid <- expand.grid(size = c(1,2,3,4,5), decay = c(0.2,0.5,0.8,1,1.5,2,3,4,5,6,7,8,9,10))
+
+model.nn1 <- caret::train(class~.,
+                  data = data_pix.train,
+                  method = "nnet",tuneGrid = my.grid,trControl = ctrl)
+
+end_timenet = Sys.time()
+end_timenet - start_timenet
+```
+
+
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+model.nn1
+```
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, cache=TRUE}
+cat("Best parameter pour size est :" , model.nn1$bestTune$size,"\n")
+cat("Best parameter pour decay  est :" , model.nn1$bestTune$decay,"\n")
+
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 4.5}
+plot(model.nn1)
+```
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 6, fig.width = 8}
+library(NeuralNetTools)
+plotnet(model.nn1,x_names = NULL, y_names = "class",pad_x = 0.8,pad_y = 1, alpha = 0.6,)
+```
+#### **Apply model to the test set**
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+predictions1 <- predict(model.nn1, data_pix.test,type = 'raw')
+```
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+postResample(predictions1, data_pix.test$class)
+caret::confusionMatrix(predictions1, data_pix.test$class)
+
+```
+
+
+
+#### Plus proche voisins KNN
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+library(caret)
+set.seed(100)
+start_timeknn = Sys.time()
+ctrl <- trainControl(method="cv",number = 10,search = "grid")
+k<-data.frame(k = seq(1,13,3))
+
+
+model_knn <- caret::train(class~ ., data = acp_train_dt, method = "knn",trControl = ctrl, tuneGrid = k)
+
+
+end_timeknn = Sys.time()
+end_timeknn - start_timeknn
+```
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE}
+model_knn
+```
+```{r , echo=FALSE,cache=TRUE,eval=TRUE, cache=TRUE}
+cat("Best parameter pour k est :" , model_knn$bestTune$k,"\n")
+
+```
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 4.5}
+plot(model_knn)
+```
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 5.5}
+plot(varImp(model_knn))
+```
+#### **Apply model to the test set**
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE,cache = TRUE}
+predict_knn <- predict(model_knn, acp_test_dt, type='raw')
+```
+
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE}
+postResample(predict_knn, data_pix.test$class)
+caret::confusionMatrix(predict_knn, acp_test_dt$class)
+```
+
+
+#### **Confusion Table**
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE}
+confusionknn1<-table(predict_knn, acp_test_dt$class)
+
+
+knn.acc1<-diag(confusionknn1)/sum(confusionknn1)
+
+
+n = sum(confusionknn1) # number of instances
+ nc = nrow(confusionknn1) # number of classes
+ diag = diag(confusionknn1) # number of correctly classified instances per class 
+ rowsums = apply(confusionknn1, 1, sum) # number of instances per class
+ colsums = apply(confusionknn1, 2, sum) # number of predictions per class
+ p = rowsums / n # distribution of instances over the actual classes
+ q = colsums / n # distribution of instances over the predicted classes
+knn.acc1 = sum(diag) / n
+ knn.recall1 = diag / colsums 
+ knn.precision1 = diag / rowsums 
+
+
+
+
+resultats.knn <- data.frame( 'Durée'=c(end_timeknn - start_timeknn),Accuracy=c(knn.acc1),'Taux Erreur' = c(1-knn.acc1), row.names=c("KNN"))
+
+
+```
+```{r, eval=TRUE,echo=FALSE, warning = FALSE, cache=TRUE}
+
+kable(resultats.knn,booktabs= T,caption = "Resultats KNN")  #%>%
+ # kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+### Perceptron multicouche
+```{r,echo=FALSE,eval=TRUE, warning=FALSE, message=FALSE,results='hide',cache = TRUE}
+library(caret)
+start_timenet = Sys.time()
+set.seed(400)
+ctrl <- trainControl(method="cv",number = 5, search = "grid")
+
+#my.grid <- expand.grid(size = c(1,2,3,4,5), decay = c(0.2,0.5,0.8,1,1.5,2,3,4,5,6,7,8,9,10))
+
+my.grid <- expand.grid(
+layer1 = c(240),
+                       layer2 = c(10),
+                       layer3 = c(0))
+
+model.mlp1 <- caret::train(class~.,
+                  data = data_pix.train,
+                  method = "mlpML",tuneGrid = my.grid,trControl = ctrl)
+
+end_timenet = Sys.time()
+end_timenet - start_timenet
+```
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+model.mlp1
+```
+```{r , echo=FALSE,cache=TRUE,eval=FALSE, cache=TRUE}
+cat("Best parameter pour size est :" , model.mlp1$bestTune$size,"\n")
+cat("Best parameter pour decay  est :" , model.mlp1$bestTune$decay,"\n")
+
+```
+
+```{r, eval=FALSE,echo=FALSE, warning = FALSE, cache=TRUE, fig.align = 'center', fig.height = 2.5, fig.width = 4.5}
+plot(model.mlp1)
+```
+#### **Apply model to the test set**
+
+```{r,echo=FALSE, warning = FALSE,cache = TRUE}
+predictions1 <- predict(model.mlp1, data_pix.test,type = 'raw')
+```
+
+```{r,echo=FALSE, warning = FALSE, cache=TRUE}
+postResample(predictions1, data_pix.test$class)
+caret::confusionMatrix(predictions1, data_pix.test$class)
+
+```
